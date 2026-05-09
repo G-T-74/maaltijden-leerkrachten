@@ -1,66 +1,125 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+import { createClient } from '@/utils/supabase/server'
+import { redirect } from 'next/navigation'
+import OrderForm from '@/components/OrderForm'
+import OrderOverview from '@/components/OrderOverview'
 
-export default function Home() {
+export default async function Home() {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    redirect('/login')
+  }
+
+  // Haal profiel info op (voor de rol)
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  const isAdmin = profile?.role === 'admin'
+
+  const emailPart = user.email ? user.email.split('@')[0] : ''
+  const firstName = emailPart ? emailPart.split('.')[0] : ''
+  const capitalizedFirstName = firstName ? firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase() : ''
+
+  // Check of de gebruiker al scholen heeft geselecteerd en haal details op
+  const { data: userSchools } = await supabase
+    .from('user_schools')
+    .select(`
+      school_id,
+      schools (
+        id,
+        name,
+        caterer_id,
+        logo_url
+      )
+    `)
+    .eq('user_id', user.id)
+
+  if (!userSchools || userSchools.length === 0) {
+    redirect('/profile')
+  }
+  
+  // Format data for the OrderForm component
+  const formattedSchools = userSchools.map((us: any) => ({
+    school: us.schools
+  }))
+
+  // Haal de geplaatste bestellingen op (vandaag en in de toekomst, en de afgelopen 30 dagen)
+  const thirtyDaysAgo = new Date()
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+  
+  const { data: orders } = await supabase
+    .from('orders')
+    .select(`
+      id,
+      order_date,
+      quantity,
+      price_at_order,
+      schools ( name ),
+      meals ( id, name, category, caterer_id )
+    `)
+    .eq('user_id', user.id)
+    .gte('order_date', thirtyDaysAgo.toISOString().split('T')[0])
+    .order('order_date', { ascending: false })
+
+  // Haal actieve maaltijden op voor inline-editing (voor de caterers van de geselecteerde scholen)
+  const catererIds = [...new Set(formattedSchools.map(s => s.school.caterer_id).filter(Boolean))]
+  let availableMeals: Record<string, any[]> = {}
+  
+  if (catererIds.length > 0) {
+    const { data: meals } = await supabase
+      .from('meals')
+      .select('id, name, category, price, caterer_id')
+      .in('caterer_id', catererIds)
+      .eq('is_active', true)
+      .order('category')
+      .order('name')
+      
+    if (meals) {
+      meals.forEach(meal => {
+        if (!availableMeals[meal.caterer_id]) {
+          availableMeals[meal.caterer_id] = []
+        }
+        availableMeals[meal.caterer_id].push(meal)
+      })
+    }
+  }
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>To get started, edit the page.tsx file.</h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+    <main style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto', position: 'relative' }}>
+      {isAdmin && (
+        <a 
+          href="/admin" 
+          title="Naar Beheerdersdashboard" 
+          style={{ position: 'absolute', top: '2rem', right: '2rem', textDecoration: 'none', color: 'var(--text-main)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        </a>
+      )}
+
+      <h1 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '1rem' }}>
+        Dashboard
+      </h1>
+      <p style={{ color: 'var(--text-muted)' }}>
+        Welkom {capitalizedFirstName ? `${capitalizedFirstName}, je` : 'je'} bent succesvol ingelogd!
+      </p>
+      
+      <OrderForm userSchools={formattedSchools} />
+      
+      <OrderOverview orders={orders || []} availableMeals={availableMeals} />
+
+      <form action="/auth/signout" method="post" style={{ marginTop: '2rem' }}>
+        <button type="submit" className="btn" style={{ backgroundColor: 'var(--surface-hover)', color: 'var(--text-main)', border: '1px solid var(--border)' }}>
+          Uitloggen
+        </button>
+      </form>
+    </main>
+  )
 }

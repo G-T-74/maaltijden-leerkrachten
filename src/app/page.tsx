@@ -113,7 +113,7 @@ export default async function Home() {
       
       <OrderForm userSchools={formattedSchools} />
       
-      <OrderOverview orders={orders || []} availableMeals={availableMeals} />
+      <OrderOverview orders={(orders as any) || []} availableMeals={availableMeals} />
 
       <form action="/auth/signout" method="post" style={{ marginTop: '2rem' }}>
         <button type="submit" className="btn" style={{ backgroundColor: 'var(--surface-hover)', color: 'var(--text-main)', border: '1px solid var(--border)' }}>

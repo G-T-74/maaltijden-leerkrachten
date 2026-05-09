@@ -24,7 +24,7 @@ export default function KitchenTotalsReport() {
       if (data) {
         // Groeperen per maaltijd
         const grouped: Record<string, { meal: any, total: number }> = {}
-        data.forEach(order => {
+        data.forEach((order: any) => {
           const mealId = order.meals?.id
           if (!mealId) return
           if (!grouped[mealId]) {

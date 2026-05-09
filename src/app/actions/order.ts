@@ -9,7 +9,7 @@ export async function getMealsForSchool(schoolId: string) {
   // Haal caterer_id op voor de gegeven school
   const { data: school } = await supabase
     .from('schools')
-    .select('caterer_id, logo_url, name')
+    .select('id, caterer_id, logo_url, name')
     .eq('id', schoolId)
     .single()
 

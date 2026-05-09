@@ -26,7 +26,7 @@ export default function DailyOrdersReport() {
 
       if (data) {
         // Sorteren op naam van de leerkracht
-        const sortedData = data.sort((a, b) => {
+        const sortedData = data.sort((a: any, b: any) => {
           const nameA = `${a.profiles?.first_name || ''} ${a.profiles?.last_name || ''}`.trim()
           const nameB = `${b.profiles?.first_name || ''} ${b.profiles?.last_name || ''}`.trim()
           return nameA.localeCompare(nameB)

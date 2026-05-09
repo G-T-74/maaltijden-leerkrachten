@@ -17,7 +17,7 @@ export async function saveSchools(formData: FormData) {
   const selectedSchools = formData.getAll('schools') as string[]
 
   if (selectedSchools.length === 0) {
-    return { error: 'Selecteer minimaal één school.' }
+    throw new Error('Selecteer minimaal één school.')
   }
 
   // Prepare insert data
@@ -33,7 +33,7 @@ export async function saveSchools(formData: FormData) {
     .eq('user_id', user.id)
 
   if (deleteError) {
-    return { error: 'Fout bij het updaten van scholen.' }
+    throw new Error('Fout bij het updaten van scholen.')
   }
 
   // Insert new selections
@@ -42,7 +42,7 @@ export async function saveSchools(formData: FormData) {
     .insert(userSchoolsData)
 
   if (insertError) {
-    return { error: 'Fout bij het opslaan van scholen.' }
+    throw new Error('Fout bij het opslaan van scholen.')
   }
 
   revalidatePath('/')

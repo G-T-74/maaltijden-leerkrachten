@@ -29,12 +29,16 @@ export default function OrderForm({ userSchools }: OrderFormProps) {
   const [meals, setMeals] = useState<Meal[]>([])
   const [selectedSchoolDetails, setSelectedSchoolDetails] = useState<School | null>(null)
   const [selectedMealId, setSelectedMealId] = useState<string>('')
+  const [selectedCategory, setSelectedCategory] = useState<string>('')
   const [quantity, setQuantity] = useState<number>(1)
   const [orderDate, setOrderDate] = useState<string>('')
   
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<boolean>(false)
+
+  // Bereken unieke categorieën
+  const categories = Array.from(new Set(meals.map(m => m.category))).sort()
 
   // Initialize date logic (08:15 deadline)
   useEffect(() => {
@@ -66,10 +70,19 @@ export default function OrderForm({ userSchools }: OrderFormProps) {
       if (result.error) {
         setError(result.error)
         setMeals([])
+        setSelectedCategory('')
       } else {
         setMeals(result.meals)
         setSelectedSchoolDetails(result.school || null)
         setError(null)
+        
+        if (result.meals.length > 0) {
+          const uniqueCats = Array.from(new Set(result.meals.map((m: Meal) => m.category))).sort()
+          const warmCat = uniqueCats.find(c => c.toLowerCase().includes('warm'))
+          setSelectedCategory(warmCat || uniqueCats[0])
+        } else {
+          setSelectedCategory('')
+        }
       }
       setLoading(false)
     }
@@ -147,6 +160,24 @@ export default function OrderForm({ userSchools }: OrderFormProps) {
           />
         </div>
 
+        {meals.length > 0 && (
+          <div className={styles.formGroup}>
+            <label className={styles.label}>Categorie</label>
+            <select 
+              className={styles.select}
+              value={selectedCategory}
+              onChange={(e) => {
+                setSelectedCategory(e.target.value)
+                setSelectedMealId('') // Reset selected meal when category changes
+              }}
+            >
+              {categories.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <div className={styles.formGroup}>
           <label className={styles.label}>Kies een maaltijd</label>
           <input type="hidden" name="meal_id" value={selectedMealId} required />
@@ -155,7 +186,7 @@ export default function OrderForm({ userSchools }: OrderFormProps) {
           {!loading && meals.length === 0 && <p>Geen maaltijden beschikbaar voor deze school/traiteur.</p>}
           
           <div className={styles.mealsGrid}>
-            {meals.map((meal) => (
+            {meals.filter(m => m.category === selectedCategory).map((meal) => (
               <div 
                 key={meal.id} 
                 className={`${styles.mealCard} ${selectedMealId === meal.id ? styles.selected : ''}`}

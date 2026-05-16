@@ -22,22 +22,43 @@ export async function getSchoolsWithDeadlines() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user || !(await checkAdmin(supabase))) return { error: 'Geen toegang' }
 
+  // Haal gekoppelde scholen en de actieve school op uit het profiel
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('active_admin_school_id')
+    .eq('id', user.id)
+    .single()
+
   const { data: userSchools } = await supabase
     .from('user_schools')
     .select('school_id')
     .eq('user_id', user.id)
 
   const schoolIds = userSchools?.map(us => us.school_id) || []
-  if (schoolIds.length === 0) return { schools: [] }
+  if (schoolIds.length === 0) return { schools: [], activeSchoolId: null }
 
   const { data, error } = await supabase
     .from('schools')
-    .select('id, name, order_deadline')
+    .select('id, name, order_deadline, caterer_id')
     .in('id', schoolIds)
     .order('name')
 
   if (error) return { error: error.message }
-  return { schools: data }
+  return { schools: data, activeSchoolId: profile?.active_admin_school_id }
+}
+
+export async function setActiveAdminSchool(schoolId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user || !(await checkAdmin(supabase))) return { error: 'Geen toegang' }
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ active_admin_school_id: schoolId })
+    .eq('id', user.id)
+
+  if (error) return { error: error.message }
+  return { success: true }
 }
 
 export async function updateSchoolDeadline(schoolId: string, deadline: string) {
@@ -79,23 +100,26 @@ export async function getCaterers() {
   return { caterers: data }
 }
 
-export async function getAdminMeals() {
+export async function getAdminMeals(catererId: string | null) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user || !(await checkAdmin(supabase))) return { error: 'Geen toegang' }
 
+  if (!catererId) return { meals: [] }
+
+  // Check if admin has access to this caterer via their schools
   const { data: userSchools } = await supabase
     .from('user_schools')
     .select('schools(caterer_id)')
     .eq('user_id', user.id)
 
   const catererIds = userSchools?.map(us => (us.schools as any)?.caterer_id).filter(Boolean) || []
-  if (catererIds.length === 0) return { meals: [] }
+  if (!catererIds.includes(catererId)) return { error: 'Geen toegang tot deze traiteur.' }
 
   const { data, error } = await supabase
     .from('meals')
     .select('id, name, category, price, is_active, caterer_id, caterers(name)')
-    .in('caterer_id', catererIds)
+    .eq('caterer_id', catererId)
     .order('category')
     .order('name')
 

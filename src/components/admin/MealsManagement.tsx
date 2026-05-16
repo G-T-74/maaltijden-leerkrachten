@@ -19,7 +19,7 @@ type Caterer = {
   name: string
 }
 
-export default function MealsManagement() {
+export default function MealsManagement({ catererId: activeCatererId }: { catererId: string | null }) {
   const [meals, setMeals] = useState<Meal[]>([])
   const [caterers, setCaterers] = useState<Caterer[]>([])
   const [loading, setLoading] = useState(true)
@@ -39,7 +39,7 @@ export default function MealsManagement() {
   const loadData = async () => {
     setLoading(true)
     const [mealsRes, caterersRes] = await Promise.all([
-      getAdminMeals(),
+      getAdminMeals(activeCatererId),
       getCaterers()
     ])
     
@@ -48,9 +48,13 @@ export default function MealsManagement() {
       
     if (caterersRes.error && !error) setError(caterersRes.error)
     else if (caterersRes.caterers) {
-      setCaterers(caterersRes.caterers)
-      if (caterersRes.caterers.length > 0) {
-        setCatererId(caterersRes.caterers[0].id)
+      // Filter the caterers to only include the active one so they don't add meals for another caterer via this screen
+      const activeCaterer = caterersRes.caterers.find((c: Caterer) => c.id === activeCatererId)
+      if (activeCaterer) {
+        setCaterers([activeCaterer])
+        setCatererId(activeCaterer.id)
+      } else {
+        setCaterers([])
       }
     }
     setLoading(false)
@@ -58,7 +62,7 @@ export default function MealsManagement() {
 
   useEffect(() => {
     loadData()
-  }, [])
+  }, [activeCatererId])
 
   const resetForm = () => {
     setIsEditing(false)

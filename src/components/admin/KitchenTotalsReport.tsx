@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
 
-export default function KitchenTotalsReport() {
+export default function KitchenTotalsReport({ schoolId }: { schoolId: string }) {
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0])
   const [totals, setTotals] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -20,6 +20,7 @@ export default function KitchenTotalsReport() {
           meals ( id, name, category )
         `)
         .eq('order_date', date)
+        .eq('school_id', schoolId)
 
       if (data) {
         // Groeperen per maaltijd
@@ -46,7 +47,7 @@ export default function KitchenTotalsReport() {
     }
 
     fetchTotals()
-  }, [date])
+  }, [date, schoolId])
 
   return (
     <div>

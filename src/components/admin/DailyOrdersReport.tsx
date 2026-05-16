@@ -5,7 +5,7 @@ import { createClient } from '@/utils/supabase/client'
 import { updateOrder, deleteOrder } from '@/app/actions/order'
 import { getAdminMeals } from '@/app/actions/admin'
 
-export default function DailyOrdersReport() {
+export default function DailyOrdersReport({ schoolId, catererId }: { schoolId: string, catererId: string }) {
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0])
   const [orders, setOrders] = useState<any[]>([])
   const [allMeals, setAllMeals] = useState<any[]>([])
@@ -31,6 +31,7 @@ export default function DailyOrdersReport() {
         meals ( name, category )
       `)
       .eq('order_date', date)
+      .eq('school_id', schoolId)
 
     if (data) {
       const sortedData = data.sort((a: any, b: any) => {
@@ -45,14 +46,14 @@ export default function DailyOrdersReport() {
 
   useEffect(() => {
     async function init() {
-      const { meals } = await getAdminMeals()
+      const { meals } = await getAdminMeals(catererId)
       if (meals) {
         setAllMeals(meals)
       }
       fetchOrders()
     }
     init()
-  }, [date])
+  }, [date, schoolId, catererId])
 
   const handleEdit = (order: any) => {
     setEditingId(order.id)

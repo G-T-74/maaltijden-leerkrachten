@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/utils/supabase/client'
 
-export default function MonthlyOverviewReport() {
+export default function MonthlyOverviewReport({ schoolId }: { schoolId: string }) {
   const [month, setMonth] = useState<string>(() => {
     const d = new Date()
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
@@ -35,6 +35,7 @@ export default function MonthlyOverviewReport() {
         `)
         .gte('order_date', startDate)
         .lte('order_date', endDate)
+        .eq('school_id', schoolId)
         .order('order_date', { ascending: true })
 
       if (data) {
@@ -44,7 +45,7 @@ export default function MonthlyOverviewReport() {
     }
 
     fetchMonthlyOrders()
-  }, [month])
+  }, [month, schoolId])
 
   // Groepeer op leerkracht
   const groupedByTeacher = useMemo(() => {

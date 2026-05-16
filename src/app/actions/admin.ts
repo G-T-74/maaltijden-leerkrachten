@@ -19,11 +19,21 @@ async function checkAdmin(supabase: any) {
 
 export async function getSchoolsWithDeadlines() {
   const supabase = await createClient()
-  if (!(await checkAdmin(supabase))) return { error: 'Geen toegang' }
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user || !(await checkAdmin(supabase))) return { error: 'Geen toegang' }
+
+  const { data: userSchools } = await supabase
+    .from('user_schools')
+    .select('school_id')
+    .eq('user_id', user.id)
+
+  const schoolIds = userSchools?.map(us => us.school_id) || []
+  if (schoolIds.length === 0) return { schools: [] }
 
   const { data, error } = await supabase
     .from('schools')
     .select('id, name, order_deadline')
+    .in('id', schoolIds)
     .order('name')
 
   if (error) return { error: error.message }
@@ -48,11 +58,21 @@ export async function updateSchoolDeadline(schoolId: string, deadline: string) {
 
 export async function getCaterers() {
   const supabase = await createClient()
-  if (!(await checkAdmin(supabase))) return { error: 'Geen toegang' }
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user || !(await checkAdmin(supabase))) return { error: 'Geen toegang' }
+
+  const { data: userSchools } = await supabase
+    .from('user_schools')
+    .select('schools(caterer_id)')
+    .eq('user_id', user.id)
+
+  const catererIds = userSchools?.map(us => (us.schools as any)?.caterer_id).filter(Boolean) || []
+  if (catererIds.length === 0) return { caterers: [] }
 
   const { data, error } = await supabase
     .from('caterers')
     .select('id, name')
+    .in('id', catererIds)
     .order('name')
 
   if (error) return { error: error.message }
@@ -61,11 +81,21 @@ export async function getCaterers() {
 
 export async function getAdminMeals() {
   const supabase = await createClient()
-  if (!(await checkAdmin(supabase))) return { error: 'Geen toegang' }
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user || !(await checkAdmin(supabase))) return { error: 'Geen toegang' }
+
+  const { data: userSchools } = await supabase
+    .from('user_schools')
+    .select('schools(caterer_id)')
+    .eq('user_id', user.id)
+
+  const catererIds = userSchools?.map(us => (us.schools as any)?.caterer_id).filter(Boolean) || []
+  if (catererIds.length === 0) return { meals: [] }
 
   const { data, error } = await supabase
     .from('meals')
     .select('id, name, category, price, is_active, caterer_id, caterers(name)')
+    .in('caterer_id', catererIds)
     .order('category')
     .order('name')
 

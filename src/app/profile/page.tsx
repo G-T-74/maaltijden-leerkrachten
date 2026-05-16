@@ -57,9 +57,18 @@ export default async function ProfilePage() {
       <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '1rem' }}>Gekoppelde scholen</h2>
       {isAdmin ? (
         <div style={{ padding: '1.5rem', backgroundColor: 'var(--surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-          <p style={{ color: 'var(--text-muted)' }}>
-            Als beheerder (admin) heb je automatisch toegang tot de overzichten van alle scholen en traiteurs. Het is niet nodig om jezelf aan specifieke scholen te koppelen.
+          <p style={{ color: 'var(--text-muted)', marginBottom: '1rem' }}>
+            Als beheerder (admin) kun je het dashboard enkel gebruiken voor de scholen waaraan je hieronder gekoppeld bent. Om veiligheidsredenen kan een beheerder dit niet zelf wijzigen.
           </p>
+          {selectedSchoolIds.length > 0 ? (
+            <ul style={{ listStyleType: 'disc', paddingLeft: '1.5rem', color: 'var(--text-main)' }}>
+              {schools?.filter(s => selectedSchoolIds.includes(s.id)).map(school => (
+                <li key={school.id} style={{ marginBottom: '0.25rem' }}>{school.name}</li>
+              ))}
+            </ul>
+          ) : (
+            <p style={{ color: 'var(--primary)', fontWeight: 'bold' }}>Je bent momenteel aan geen enkele school gekoppeld.</p>
+          )}
         </div>
       ) : (
         <>

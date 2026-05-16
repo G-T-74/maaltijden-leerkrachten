@@ -29,6 +29,7 @@ export default function OrderOverview({ orders, availableMeals }: OrderOverviewP
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null)
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [showAllOrders, setShowAllOrders] = useState(false)
 
   // Local state for the edit form
   const [editMealId, setEditMealId] = useState<string>('')
@@ -104,14 +105,38 @@ export default function OrderOverview({ orders, availableMeals }: OrderOverviewP
     )
   }
 
+  // Bereken start van deze week (maandag)
+  const startOfWeek = new Date()
+  const day = startOfWeek.getDay()
+  const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1)
+  startOfWeek.setDate(diff)
+  startOfWeek.setHours(0, 0, 0, 0)
+
+  const visibleOrders = showAllOrders 
+    ? orders 
+    : orders.filter(order => new Date(order.order_date) >= startOfWeek)
+
   return (
     <div className={styles.container}>
-      <h2 className={styles.title}>Mijn Bestellingen</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
+        <h2 className={styles.title} style={{ marginBottom: 0 }}>Mijn Bestellingen</h2>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.9rem', color: 'var(--text-main)' }}>
+          <input 
+            type="checkbox" 
+            checked={showAllOrders}
+            onChange={(e) => setShowAllOrders(e.target.checked)}
+            style={{ width: 'auto', margin: 0 }}
+          />
+          Toon historiek (30 dagen)
+        </label>
+      </div>
       
       {error && <div className={styles.error}>{error}</div>}
 
       <div className={styles.orderList}>
-        {orders.map((order) => {
+        {visibleOrders.length === 0 && !showAllOrders ? (
+          <p style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Geen bestellingen gevonden vanaf deze week. Vink de optie hierboven aan om eerdere bestellingen te zien.</p>
+        ) : visibleOrders.map((order) => {
           const editable = isEditable(order.order_date)
           const isEditing = editingOrderId === order.id
           const isLoading = loadingId === order.id

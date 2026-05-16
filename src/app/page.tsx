@@ -115,11 +115,16 @@ export default async function Home() {
       
       <OrderOverview orders={(orders as any) || []} availableMeals={availableMeals} />
 
-      <form action="/auth/signout" method="post" style={{ marginTop: '2rem' }}>
-        <button type="submit" className="btn" style={{ backgroundColor: 'var(--surface-hover)', color: 'var(--text-main)', border: '1px solid var(--border)' }}>
-          Uitloggen
-        </button>
-      </form>
+      <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem', flexWrap: 'wrap' }}>
+        <a href="/profile" className="btn" style={{ backgroundColor: 'var(--surface-hover)', color: 'var(--text-main)', border: '1px solid var(--border)', textDecoration: 'none' }}>
+          Instellingen / Profiel
+        </a>
+        <form action="/auth/signout" method="post">
+          <button type="submit" className="btn" style={{ backgroundColor: 'var(--surface-hover)', color: 'var(--text-main)', border: '1px solid var(--border)' }}>
+            Uitloggen
+          </button>
+        </form>
+      </div>
     </main>
   )
 }

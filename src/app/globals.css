@@ -24,19 +24,17 @@
   --shadow-glow: 0 0 20px var(--primary-glow);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #09090b;
-    --surface: #18181b;
-    --surface-hover: #27272a;
-    --border: #3f3f46;
-    --text-main: #fafafa;
-    --text-muted: #a1a1aa;
-    
-    --primary: #F3354B;
-    --primary-hover: #fc5c6f;
-    --primary-glow: rgba(243, 53, 75, 0.3);
-  }
+.dark {
+  --background: #09090b;
+  --surface: #18181b;
+  --surface-hover: #27272a;
+  --border: #3f3f46;
+  --text-main: #fafafa;
+  --text-muted: #a1a1aa;
+  
+  --primary: #F3354B;
+  --primary-hover: #fc5c6f;
+  --primary-glow: rgba(243, 53, 75, 0.3);
 }
 
 * {

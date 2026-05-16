@@ -62,17 +62,34 @@ export async function placeOrder(formData: FormData) {
     return { error: 'Maaltijd niet gevonden.' }
   }
 
-  // Check 08:15 deadline via onze PostgreSQL functie
-  const { data: isAllowed, error: dbError } = await supabase
-    .rpc('is_order_allowed', { p_order_date: orderDate })
-
-  if (dbError) {
-    console.error('Database error checking deadline:', dbError)
-    return { error: 'Fout bij het controleren van de deadline.' }
+  // Check weekend in backend
+  const dateObj = new Date(orderDate)
+  if (dateObj.getDay() === 0 || dateObj.getDay() === 6) {
+    return { error: 'Bestellen voor zaterdag of zondag is niet toegestaan.' }
   }
 
-  if (!isAllowed) {
-    return { error: 'De deadline (08:15) voor deze datum is verstreken.' }
+  // Haal rol van gebruiker op (admin mag altijd)
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  const isAdmin = profile?.role === 'admin'
+
+  if (!isAdmin) {
+    // Check 08:15 (of school-specifieke) deadline via PostgreSQL functie
+    const { data: isAllowed, error: dbError } = await supabase
+      .rpc('is_order_allowed', { p_order_date: orderDate, p_school_id: schoolId })
+
+    if (dbError) {
+      console.error('Database error checking deadline:', dbError)
+      return { error: 'Fout bij het controleren van de deadline.' }
+    }
+
+    if (!isAllowed) {
+      return { error: 'De besteldeadline voor deze datum is verstreken.' }
+    }
   }
 
   const { error: insertError } = await supabase
@@ -103,10 +120,10 @@ export async function deleteOrder(orderId: string) {
     return { error: 'Je moet ingelogd zijn.' }
   }
 
-  // Haal de order op om de datum te checken
+  // Haal de order op om de datum en school te checken
   const { data: order } = await supabase
     .from('orders')
-    .select('order_date')
+    .select('order_date, school_id')
     .eq('id', orderId)
     .single()
 
@@ -114,12 +131,23 @@ export async function deleteOrder(orderId: string) {
     return { error: 'Bestelling niet gevonden.' }
   }
 
-  // Check deadline
-  const { data: isAllowed, error: dbError } = await supabase
-    .rpc('is_order_allowed', { p_order_date: order.order_date })
+  // Haal rol van gebruiker op (admin mag altijd)
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
 
-  if (dbError || !isAllowed) {
-    return { error: 'Je kunt deze bestelling niet meer annuleren (deadline verstreken).' }
+  const isAdmin = profile?.role === 'admin'
+
+  if (!isAdmin) {
+    // Check deadline
+    const { data: isAllowed, error: dbError } = await supabase
+      .rpc('is_order_allowed', { p_order_date: order.order_date, p_school_id: order.school_id })
+
+    if (dbError || !isAllowed) {
+      return { error: 'Je kunt deze bestelling niet meer annuleren (deadline verstreken).' }
+    }
   }
 
   // Delete it
@@ -152,10 +180,10 @@ export async function updateOrder(formData: FormData) {
     return { error: 'Ongeldige invoer.' }
   }
 
-  // Haal de order op om de datum te checken
+  // Haal de order op om de datum en school te checken
   const { data: order } = await supabase
     .from('orders')
-    .select('order_date')
+    .select('order_date, school_id')
     .eq('id', orderId)
     .single()
 
@@ -163,12 +191,23 @@ export async function updateOrder(formData: FormData) {
     return { error: 'Bestelling niet gevonden.' }
   }
 
-  // Check deadline
-  const { data: isAllowed, error: dbError } = await supabase
-    .rpc('is_order_allowed', { p_order_date: order.order_date })
+  // Haal rol van gebruiker op (admin mag altijd)
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
 
-  if (dbError || !isAllowed) {
-    return { error: 'Je kunt deze bestelling niet meer wijzigen (deadline verstreken).' }
+  const isAdmin = profile?.role === 'admin'
+
+  if (!isAdmin) {
+    // Check deadline
+    const { data: isAllowed, error: dbError } = await supabase
+      .rpc('is_order_allowed', { p_order_date: order.order_date, p_school_id: order.school_id })
+
+    if (dbError || !isAllowed) {
+      return { error: 'Je kunt deze bestelling niet meer wijzigen (deadline verstreken).' }
+    }
   }
 
   // Haal nieuwe prijs op

@@ -34,7 +34,8 @@ export default async function Home() {
         id,
         name,
         caterer_id,
-        logo_url
+        logo_url,
+        order_deadline
       )
     `)
     .eq('user_id', user.id)

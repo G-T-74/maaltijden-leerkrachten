@@ -9,6 +9,7 @@ type School = {
   name: string
   caterer_id: string | null
   logo_url: string | null
+  order_deadline?: string
 }
 
 type Meal = {
@@ -40,8 +41,23 @@ export default function OrderForm({ userSchools }: OrderFormProps) {
   // Bereken unieke categorieën
   const categories = Array.from(new Set(meals.map(m => m.category))).sort()
 
-  // Initialize date logic (08:15 deadline)
+  // Functie om de eerstvolgende geldige weekdag te vinden
+  const getNextValidDay = (date: Date) => {
+    const d = new Date(date)
+    while (d.getDay() === 0 || d.getDay() === 6) {
+      d.setDate(d.getDate() + 1)
+    }
+    return d
+  }
+
+  // Initialize date logic based on school deadline
   useEffect(() => {
+    if (orderDate) return // Alleen initiële datum instellen
+
+    const school = userSchools.find(us => us.school.id === selectedSchoolId)?.school
+    const deadline = school?.order_deadline || '08:15:00'
+    const [hours, minutes] = deadline.split(':').map(Number)
+
     const now = new Date()
     // Brussels time approximation
     const brusselsTime = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Brussels" }))
@@ -50,14 +66,21 @@ export default function OrderForm({ userSchools }: OrderFormProps) {
     
     let defaultDate = new Date(brusselsTime)
     
-    // If it's past 08:15, default to tomorrow
-    if (currentHour > 8 || (currentHour === 8 && currentMinute >= 15)) {
+    // If it's past the deadline, default to tomorrow
+    if (currentHour > hours || (currentHour === hours && currentMinute >= minutes)) {
       defaultDate.setDate(defaultDate.getDate() + 1)
     }
     
+    // Zorg dat het geen weekend is
+    defaultDate = getNextValidDay(defaultDate)
+    
     // Format YYYY-MM-DD
     setOrderDate(defaultDate.toISOString().split('T')[0])
-  }, [])
+  }, [selectedSchoolId, userSchools, orderDate])
+
+  // Check of gekozen datum een weekend is
+  const chosenDateObj = orderDate ? new Date(orderDate) : null
+  const isWeekend = chosenDateObj ? (chosenDateObj.getDay() === 0 || chosenDateObj.getDay() === 6) : false
 
   // Fetch meals when school changes
   useEffect(() => {
@@ -153,11 +176,16 @@ export default function OrderForm({ userSchools }: OrderFormProps) {
           <input 
             type="date" 
             name="order_date" 
-            className={styles.input}
+            className={`${styles.input} ${isWeekend ? styles.inputError : ''}`}
             value={orderDate}
             onChange={(e) => setOrderDate(e.target.value)}
             required
           />
+          {isWeekend && (
+            <p style={{ color: 'var(--primary)', fontSize: '0.875rem', marginTop: '0.5rem' }}>
+              Bestellen voor het weekend is niet mogelijk.
+            </p>
+          )}
         </div>
 
         {meals.length > 0 && (
@@ -218,7 +246,7 @@ export default function OrderForm({ userSchools }: OrderFormProps) {
         <button 
           type="submit" 
           className={styles.submitBtn}
-          disabled={loading || !selectedMealId}
+          disabled={loading || !selectedMealId || isWeekend}
         >
           {loading ? 'Bezig met bestellen...' : 'Bestelling Plaatsen'}
         </button>

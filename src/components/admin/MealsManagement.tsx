@@ -130,7 +130,7 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
       
       {error && <div style={{ color: 'var(--primary)', marginBottom: '1rem' }}>{error}</div>}
 
-      <div className={styles.formCard}>
+      <div className={`${styles.formCard} no-print`}>
         <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginBottom: '1rem' }}>
           {isEditing ? 'Maaltijd Wijzigen' : 'Nieuwe Maaltijd Toevoegen'}
         </h3>
@@ -214,7 +214,7 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
               <th>Prijs</th>
               <th>Traiteur</th>
               <th>Status</th>
-              <th>Acties</th>
+              <th className="no-print">Acties</th>
             </tr>
           </thead>
           <tbody>
@@ -229,7 +229,7 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
                     {meal.is_active ? 'Actief' : 'Inactief'}
                   </span>
                 </td>
-                <td>
+                <td className="no-print">
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <button onClick={() => handleEdit(meal)} className={`${styles.actionBtn} ${styles.editBtn}`}>
                       Wijzig

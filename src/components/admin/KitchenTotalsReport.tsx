@@ -53,7 +53,7 @@ export default function KitchenTotalsReport({ schoolId }: { schoolId: string }) 
     <div>
       <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem' }}>Keukenoverzicht (Totalen)</h2>
       
-      <div style={{ marginBottom: '2rem' }}>
+      <div className="no-print" style={{ marginBottom: '2rem' }}>
         <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Selecteer Datum</label>
         <input 
           type="date" 

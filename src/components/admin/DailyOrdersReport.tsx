@@ -98,7 +98,7 @@ export default function DailyOrdersReport({ schoolId, catererId }: { schoolId: s
     <div>
       <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem', color: 'var(--text-main)' }}>Dagoverzicht (Gedetailleerd)</h2>
       
-      <div style={{ marginBottom: '2rem' }}>
+      <div className="no-print" style={{ marginBottom: '2rem' }}>
         <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500, color: 'var(--text-muted)' }}>Selecteer Datum</label>
         <input 
           type="date" 
@@ -128,7 +128,7 @@ export default function DailyOrdersReport({ schoolId, catererId }: { schoolId: s
                 <th style={{ padding: '1rem', color: 'var(--text-muted)', fontWeight: 500 }}>Aantal</th>
                 <th style={{ padding: '1rem', color: 'var(--text-muted)', fontWeight: 500 }}>Prijs p.s.</th>
                 <th style={{ padding: '1rem', color: 'var(--text-muted)', fontWeight: 500 }}>Totaal</th>
-                <th style={{ padding: '1rem', color: 'var(--text-muted)', fontWeight: 500 }}>Acties</th>
+                <th className="no-print" style={{ padding: '1rem', color: 'var(--text-muted)', fontWeight: 500 }}>Acties</th>
               </tr>
             </thead>
             <tbody>
@@ -165,7 +165,7 @@ export default function DailyOrdersReport({ schoolId, catererId }: { schoolId: s
                         </td>
                         <td style={{ padding: '1rem', color: 'var(--text-muted)' }}>-</td>
                         <td style={{ padding: '1rem', color: 'var(--text-muted)' }}>-</td>
-                        <td style={{ padding: '1rem' }}>
+                        <td className="no-print" style={{ padding: '1rem' }}>
                           <div style={{ display: 'flex', gap: '0.5rem' }}>
                             <button 
                               onClick={() => handleSave(order.id)} 
@@ -192,7 +192,7 @@ export default function DailyOrdersReport({ schoolId, catererId }: { schoolId: s
                         <td style={{ padding: '1rem' }}>{order.quantity}</td>
                         <td style={{ padding: '1rem' }}>€{Number(order.price_at_order).toFixed(2)}</td>
                         <td style={{ padding: '1rem', fontWeight: 'bold' }}>€{total}</td>
-                        <td style={{ padding: '1rem' }}>
+                        <td className="no-print" style={{ padding: '1rem' }}>
                           <div style={{ display: 'flex', gap: '0.5rem' }}>
                             <button 
                               onClick={() => handleEdit(order)} 

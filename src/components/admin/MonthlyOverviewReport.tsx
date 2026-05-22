@@ -68,7 +68,7 @@ export default function MonthlyOverviewReport({ schoolId }: { schoolId: string }
     <div>
       <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem' }}>Maandoverzicht (Facturatie)</h2>
       
-      <div style={{ marginBottom: '2rem', display: 'flex', flexWrap: 'wrap', gap: '1.5rem', alignItems: 'flex-end' }}>
+      <div className="no-print" style={{ marginBottom: '2rem', display: 'flex', flexWrap: 'wrap', gap: '1.5rem', alignItems: 'flex-end' }}>
         <div>
           <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Selecteer Maand</label>
           <input 

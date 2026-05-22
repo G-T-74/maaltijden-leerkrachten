@@ -52,20 +52,31 @@ export default function AdminTabs() {
 
   return (
     <div>
-      <div style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '1rem', backgroundColor: 'var(--surface)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
-        <label style={{ fontWeight: 500, color: 'var(--text-main)' }}>Hoofdschool (Huidig overzicht):</label>
-        <select 
-          value={activeSchoolId} 
-          onChange={(e) => handleSchoolChange(e.target.value)}
-          style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--border)', backgroundColor: 'var(--background)', color: 'var(--text-main)', minWidth: '200px' }}
+      <div className="no-print" style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'var(--surface)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <label style={{ fontWeight: 500, color: 'var(--text-main)' }}>Hoofdschool (Huidig overzicht):</label>
+          <select 
+            value={activeSchoolId} 
+            onChange={(e) => handleSchoolChange(e.target.value)}
+            style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--border)', backgroundColor: 'var(--background)', color: 'var(--text-main)', minWidth: '200px' }}
+          >
+            {schools.map(s => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+        </div>
+        <button 
+          onClick={() => window.print()} 
+          style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'transparent', border: '1px solid var(--border)', borderRadius: '4px', cursor: 'pointer', fontWeight: 500, color: 'var(--text-main)' }}
         >
-          {schools.map(s => (
-            <option key={s.id} value={s.id}>{s.name}</option>
-          ))}
-        </select>
+          <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+          </svg>
+          Print Overzicht
+        </button>
       </div>
 
-      <div className={styles.tabContainer}>
+      <div className={`${styles.tabContainer} no-print`}>
         <button 
           className={`${styles.tab} ${activeTab === 'daily' ? styles.active : ''}`}
           onClick={() => setActiveTab('daily')}

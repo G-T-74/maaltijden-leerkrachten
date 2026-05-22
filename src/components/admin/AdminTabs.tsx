@@ -6,11 +6,12 @@ import DailyOrdersReport from './DailyOrdersReport'
 import KitchenTotalsReport from './KitchenTotalsReport'
 import MonthlyOverviewReport from './MonthlyOverviewReport'
 import MealsManagement from './MealsManagement'
+import StudentsManagement from './StudentsManagement'
 import SchoolSettings from './SchoolSettings'
 import styles from './AdminTabs.module.css'
 
 export default function AdminTabs() {
-  const [activeTab, setActiveTab] = useState<'daily' | 'kitchen' | 'monthly' | 'meals' | 'settings'>('daily')
+  const [activeTab, setActiveTab] = useState<'daily' | 'kitchen' | 'monthly' | 'meals' | 'students' | 'settings'>('daily')
   const [schools, setSchools] = useState<any[]>([])
   const [activeSchoolId, setActiveSchoolId] = useState<string>('')
   const [loading, setLoading] = useState(true)
@@ -102,6 +103,12 @@ export default function AdminTabs() {
           Maaltijden Beheer
         </button>
         <button 
+          className={`${styles.tab} ${activeTab === 'students' ? styles.active : ''}`}
+          onClick={() => setActiveTab('students')}
+        >
+          Leerlingen & Klassen
+        </button>
+        <button 
           className={`${styles.tab} ${activeTab === 'settings' ? styles.active : ''}`}
           onClick={() => setActiveTab('settings')}
         >
@@ -114,6 +121,7 @@ export default function AdminTabs() {
         {activeTab === 'kitchen' && <KitchenTotalsReport schoolId={activeSchool.id} />}
         {activeTab === 'monthly' && <MonthlyOverviewReport schoolId={activeSchool.id} />}
         {activeTab === 'meals' && <MealsManagement catererId={activeSchool.caterer_id} />}
+        {activeTab === 'students' && <StudentsManagement schoolId={activeSchool.id} />}
         {activeTab === 'settings' && <SchoolSettings />}
       </div>
     </div>

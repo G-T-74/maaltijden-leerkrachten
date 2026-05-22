@@ -1,0 +1,279 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: var(--text-main);
+}
+
+.card {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.cardTitle {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: var(--text-main);
+}
+
+.description {
+  color: var(--text-muted);
+  margin-bottom: 1.5rem;
+  font-size: 0.95rem;
+}
+
+.fileInput {
+  width: 100%;
+  max-width: 400px;
+  padding: 0.5rem;
+  background-color: var(--background);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.resultAlert {
+  padding: 1rem;
+  background-color: var(--primary-glow);
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-md);
+  color: var(--text-main);
+  margin-bottom: 1rem;
+  font-weight: 500;
+}
+
+/* Table / Preview */
+.previewContainer {
+  margin-top: 2rem;
+}
+
+.previewHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.tableWrapper {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.table th {
+  background-color: var(--surface-hover);
+  padding: 0.75rem 1rem;
+  position: sticky;
+  top: 0;
+  font-weight: 600;
+  color: var(--text-muted);
+  border-bottom: 2px solid var(--border);
+}
+
+.table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.rowValid {
+  background-color: rgba(34, 197, 94, 0.05); /* light green */
+}
+
+.rowInvalid {
+  background-color: rgba(239, 68, 68, 0.05); /* light red */
+}
+
+.statusOk {
+  color: var(--success);
+  font-weight: 500;
+}
+
+.statusError {
+  color: var(--error);
+  font-size: 0.85rem;
+}
+
+/* Classes Grid */
+.classesGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+
+.classBox {
+  background-color: var(--background);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.classHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.className {
+  font-weight: bold;
+  font-size: 1.1rem;
+}
+
+.classCount {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  background-color: var(--surface-hover);
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-full);
+}
+
+.studentsList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.studentRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem;
+  background-color: var(--surface);
+  border-radius: var(--radius-sm);
+  font-size: 0.95rem;
+}
+
+.studentHidden {
+  opacity: 0.5;
+  background-color: var(--background);
+  border: 1px dashed var(--border);
+}
+
+.studentInfo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.studentNum {
+  color: var(--text-muted);
+  font-weight: 500;
+  width: 24px;
+}
+
+.badgeHidden {
+  font-size: 0.7rem;
+  background-color: var(--error);
+  color: white;
+  padding: 0.1rem 0.3rem;
+  border-radius: 4px;
+}
+
+.iconBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  opacity: 0.6;
+}
+.iconBtn:hover { opacity: 1; }
+
+.addBtn {
+  width: 100%;
+  padding: 0.5rem;
+  background: transparent;
+  border: 1px dashed var(--border);
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+.addBtn:hover {
+  background-color: var(--surface-hover);
+  color: var(--text-main);
+}
+
+.addForm {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.inputSmall {
+  width: 60px;
+  padding: 0.4rem;
+}
+.inputMedium {
+  flex: 1;
+  padding: 0.4rem;
+}
+
+.iconBtnOk {
+  background-color: var(--success);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+}
+.iconBtnCancel {
+  background-color: var(--surface-hover);
+  color: var(--text-main);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+}
+
+.errorText {
+  color: var(--error);
+  font-size: 0.8rem;
+  width: 100%;
+}
+
+/* Global btn copy from globals.css for completeness */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  border: none;
+  cursor: pointer;
+}
+.btnPrimary {
+  background-color: var(--primary);
+  color: white;
+}
+.btnPrimary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

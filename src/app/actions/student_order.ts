@@ -9,29 +9,61 @@ export async function getTeacherClasses() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Niet ingelogd' }
 
-  const { data, error } = await supabase
-    .from('user_classes')
-    .select(`
-      class_id,
-      classes (
-        id,
-        name,
-        level,
-        school_id,
-        schools (
-          id, name, caterer_id
-        )
-      )
-    `)
-    .eq('user_id', user.id)
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  const isAdmin = profile?.role === 'admin'
 
-  if (error) return { error: error.message }
-  return { 
-    classes: data.map((d: any) => {
-      const cls = Array.isArray(d.classes) ? d.classes[0] : d.classes;
-      if (cls && Array.isArray(cls.schools)) cls.schools = cls.schools[0];
-      return cls;
-    }).filter(Boolean) 
+  if (isAdmin) {
+    const { data: adminSchools } = await supabase.from('user_schools').select('school_id').eq('user_id', user.id)
+    const schoolIds = adminSchools?.map(s => s.school_id) || []
+
+    if (schoolIds.length > 0) {
+      const { data: allClasses, error: classErr } = await supabase
+        .from('classes')
+        .select(`
+          id, name, level, school_id,
+          schools ( id, name, caterer_id )
+        `)
+        .in('school_id', schoolIds)
+        .order('school_id')
+        .order('name')
+        
+      if (classErr) return { error: classErr.message }
+      
+      return { 
+        classes: allClasses?.map((cls: any) => {
+          if (cls && Array.isArray(cls.schools)) cls.schools = cls.schools[0];
+          return cls;
+        }) || [] 
+      }
+    } else {
+      return { classes: [] }
+    }
+  } else {
+    // Logic for normal teachers
+    const { data, error } = await supabase
+      .from('user_classes')
+      .select(`
+        class_id,
+        classes (
+          id,
+          name,
+          level,
+          school_id,
+          schools (
+            id, name, caterer_id
+          )
+        )
+      `)
+      .eq('user_id', user.id)
+
+    if (error) return { error: error.message }
+    return { 
+      classes: data.map((d: any) => {
+        const cls = Array.isArray(d.classes) ? d.classes[0] : d.classes;
+        if (cls && Array.isArray(cls.schools)) cls.schools = cls.schools[0];
+        return cls;
+      }).filter(Boolean) 
+    }
   }
 }
 

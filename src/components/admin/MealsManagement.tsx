@@ -1,14 +1,16 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getAdminMeals, getCaterers, saveMeal, deleteMeal } from '@/app/actions/admin'
+import { getAdminMeals, getAdminStudentMeals, getCaterers, saveMeal, deleteMeal, saveStudentMeal, deleteStudentMeal } from '@/app/actions/admin'
 import styles from './MealsManagement.module.css'
 
 type Meal = {
   id: string
   name: string
-  category: string
-  price: number
+  category?: string // Optional for student meals
+  price?: number
+  price_kleuter?: number
+  price_lager?: number
   is_active: boolean
   caterer_id: string
   caterers: { name: string }
@@ -24,6 +26,7 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
   const [caterers, setCaterers] = useState<Caterer[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<'teacher' | 'student'>('teacher')
   
   // Form state
   const [isEditing, setIsEditing] = useState(false)
@@ -31,6 +34,8 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
   const [name, setName] = useState('')
   const [category, setCategory] = useState('')
   const [price, setPrice] = useState<number | ''>('')
+  const [priceKleuter, setPriceKleuter] = useState<number | ''>('')
+  const [priceLager, setPriceLager] = useState<number | ''>('')
   const [catererId, setCatererId] = useState('')
   const [isActive, setIsActive] = useState(true)
 
@@ -38,13 +43,19 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
 
   const loadData = async () => {
     setLoading(true)
-    const [mealsRes, caterersRes] = await Promise.all([
+    const [mealsRes, studentMealsRes, caterersRes] = await Promise.all([
       getAdminMeals(activeCatererId),
+      getAdminStudentMeals(activeCatererId),
       getCaterers()
     ])
     
-    if (mealsRes.error) setError(mealsRes.error)
-    else if (mealsRes.meals) setMeals(mealsRes.meals as any)
+    if (activeTab === 'teacher') {
+      if (mealsRes.error) setError(mealsRes.error)
+      else if (mealsRes.meals) setMeals(mealsRes.meals as any)
+    } else {
+      if (studentMealsRes.error) setError(studentMealsRes.error)
+      else if (studentMealsRes.meals) setMeals(studentMealsRes.meals as any)
+    }
       
     if (caterersRes.error && !error) setError(caterersRes.error)
     else if (caterersRes.caterers) {
@@ -62,7 +73,7 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
 
   useEffect(() => {
     loadData()
-  }, [activeCatererId])
+  }, [activeCatererId, activeTab])
 
   const resetForm = () => {
     setIsEditing(false)
@@ -70,6 +81,8 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
     setName('')
     setCategory('')
     setPrice('')
+    setPriceKleuter('')
+    setPriceLager('')
     setIsActive(true)
     if (caterers.length > 0) setCatererId(caterers[0].id)
   }
@@ -78,8 +91,13 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
     setIsEditing(true)
     setEditId(meal.id)
     setName(meal.name)
-    setCategory(meal.category)
-    setPrice(meal.price)
+    if (activeTab === 'teacher') {
+      setCategory(meal.category || '')
+      setPrice(meal.price || 0)
+    } else {
+      setPriceKleuter(meal.price_kleuter || 0)
+      setPriceLager(meal.price_lager || 0)
+    }
     setCatererId(meal.caterer_id)
     setIsActive(meal.is_active)
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -88,7 +106,7 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
   const handleDelete = async (id: string) => {
     if (!confirm('Weet je zeker dat je deze maaltijd wilt verwijderen? Let op: dit kan mislukken als er al bestellingen voor zijn geplaatst. Zet hem in dat geval op non-actief.')) return
     
-    const res = await deleteMeal(id)
+    const res = activeTab === 'teacher' ? await deleteMeal(id) : await deleteStudentMeal(id)
     if (res.error) {
       alert(res.error)
     } else {
@@ -104,12 +122,18 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
     const formData = new FormData()
     if (isEditing) formData.append('id', editId)
     formData.append('name', name)
-    formData.append('category', category)
-    formData.append('price', price.toString())
     formData.append('caterer_id', catererId)
     formData.append('is_active', isActive.toString())
+    
+    if (activeTab === 'teacher') {
+      formData.append('category', category)
+      formData.append('price', price.toString())
+    } else {
+      formData.append('price_kleuter', priceKleuter.toString())
+      formData.append('price_lager', priceLager.toString())
+    }
 
-    const res = await saveMeal(formData)
+    const res = activeTab === 'teacher' ? await saveMeal(formData) : await saveStudentMeal(formData)
     
     if (res.error) {
       setError(res.error)
@@ -124,9 +148,26 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
 
   return (
     <div>
-      <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem', color: 'var(--text-main)' }}>
-        Maaltijden Beheer
-      </h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--text-main)' }}>
+          Maaltijden Beheer
+        </h2>
+        
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button 
+            onClick={() => { setActiveTab('teacher'); resetForm(); }}
+            className={`${styles.btn} ${activeTab === 'teacher' ? styles.btnPrimary : styles.btnSecondary}`}
+          >
+            Leerkrachten
+          </button>
+          <button 
+            onClick={() => { setActiveTab('student'); resetForm(); }}
+            className={`${styles.btn} ${activeTab === 'student' ? styles.btnPrimary : styles.btnSecondary}`}
+          >
+            Leerlingen
+          </button>
+        </div>
+      </div>
       
       {error && <div style={{ color: 'var(--primary)', marginBottom: '1rem' }}>{error}</div>}
 
@@ -143,32 +184,66 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
               value={name} 
               onChange={e => setName(e.target.value)} 
               required 
-              placeholder="Bijv. Spaghetti Bolognese"
+              placeholder={activeTab === 'teacher' ? "Bijv. Spaghetti Bolognese" : "Bijv. Warme Maaltijd"}
             />
           </div>
-          <div className={styles.formGroup}>
-            <label className={styles.label}>Categorie</label>
-            <input 
-              type="text" 
-              className={styles.input} 
-              value={category} 
-              onChange={e => setCategory(e.target.value)} 
-              required 
-              placeholder="Bijv. Warm, Koud, Soep"
-            />
-          </div>
-          <div className={styles.formGroup}>
-            <label className={styles.label}>Prijs (€)</label>
-            <input 
-              type="number" 
-              step="0.01" 
-              min="0"
-              className={styles.input} 
-              value={price} 
-              onChange={e => setPrice(parseFloat(e.target.value))} 
-              required 
-            />
-          </div>
+          
+          {activeTab === 'teacher' && (
+            <div className={styles.formGroup}>
+              <label className={styles.label}>Categorie</label>
+              <input 
+                type="text" 
+                className={styles.input} 
+                value={category} 
+                onChange={e => setCategory(e.target.value)} 
+                required 
+                placeholder="Bijv. Warm, Koud, Soep"
+              />
+            </div>
+          )}
+          
+          {activeTab === 'teacher' ? (
+            <div className={styles.formGroup}>
+              <label className={styles.label}>Prijs (€)</label>
+              <input 
+                type="number" 
+                step="0.01" 
+                min="0"
+                className={styles.input} 
+                value={price} 
+                onChange={e => setPrice(parseFloat(e.target.value))} 
+                required 
+              />
+            </div>
+          ) : (
+            <>
+              <div className={styles.formGroup}>
+                <label className={styles.label}>Prijs Kleuter (€)</label>
+                <input 
+                  type="number" 
+                  step="0.01" 
+                  min="0"
+                  className={styles.input} 
+                  value={priceKleuter} 
+                  onChange={e => setPriceKleuter(parseFloat(e.target.value))} 
+                  required 
+                />
+              </div>
+              <div className={styles.formGroup}>
+                <label className={styles.label}>Prijs Lager (€)</label>
+                <input 
+                  type="number" 
+                  step="0.01" 
+                  min="0"
+                  className={styles.input} 
+                  value={priceLager} 
+                  onChange={e => setPriceLager(parseFloat(e.target.value))} 
+                  required 
+                />
+              </div>
+            </>
+          )}
+
           <div className={styles.formGroup}>
             <label className={styles.label}>Traiteur</label>
             <select 
@@ -210,8 +285,15 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
           <thead>
             <tr>
               <th>Naam</th>
-              <th>Categorie</th>
-              <th>Prijs</th>
+              {activeTab === 'teacher' && <th>Categorie</th>}
+              {activeTab === 'teacher' ? (
+                <th>Prijs</th>
+              ) : (
+                <>
+                  <th>Prijs Kleuter</th>
+                  <th>Prijs Lager</th>
+                </>
+              )}
               <th>Traiteur</th>
               <th>Status</th>
               <th className="no-print">Acties</th>
@@ -221,8 +303,15 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
             {meals.map(meal => (
               <tr key={meal.id} style={{ opacity: meal.is_active ? 1 : 0.6 }}>
                 <td>{meal.name}</td>
-                <td>{meal.category}</td>
-                <td>€{meal.price.toFixed(2)}</td>
+                {activeTab === 'teacher' && <td>{meal.category}</td>}
+                {activeTab === 'teacher' ? (
+                  <td>€{meal.price?.toFixed(2)}</td>
+                ) : (
+                  <>
+                    <td>€{meal.price_kleuter?.toFixed(2)}</td>
+                    <td>€{meal.price_lager?.toFixed(2)}</td>
+                  </>
+                )}
                 <td>{meal.caterers?.name}</td>
                 <td>
                   <span className={meal.is_active ? styles.statusActive : styles.statusInactive}>

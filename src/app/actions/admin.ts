@@ -179,3 +179,69 @@ export async function deleteMeal(id: string) {
   revalidatePath('/')
   return { success: true }
 }
+
+export async function getAdminStudentMeals(catererId: string | null) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user || !(await checkAdmin(supabase))) return { error: 'Geen toegang' }
+
+  if (!catererId) return { meals: [] }
+
+  const { data, error } = await supabase
+    .from('student_meals')
+    .select('id, name, price_kleuter, price_lager, is_active, caterer_id, caterers(name)')
+    .eq('caterer_id', catererId)
+    .order('name')
+
+  if (error) return { error: error.message }
+  return { meals: data }
+}
+
+export async function saveStudentMeal(formData: FormData) {
+  const supabase = await createClient()
+  if (!(await checkAdmin(supabase))) return { error: 'Geen toegang' }
+
+  const id = formData.get('id') as string
+  const name = formData.get('name') as string
+  const price_kleuter = parseFloat(formData.get('price_kleuter') as string)
+  const price_lager = parseFloat(formData.get('price_lager') as string)
+  const caterer_id = formData.get('caterer_id') as string
+  const is_active = formData.get('is_active') === 'true'
+
+  if (!name || isNaN(price_kleuter) || isNaN(price_lager) || !caterer_id) {
+    return { error: 'Vul alle velden correct in.' }
+  }
+
+  if (id) {
+    const { error } = await supabase
+      .from('student_meals')
+      .update({ name, price_kleuter, price_lager, caterer_id, is_active })
+      .eq('id', id)
+      
+    if (error) return { error: error.message }
+  } else {
+    const { error } = await supabase
+      .from('student_meals')
+      .insert({ name, price_kleuter, price_lager, caterer_id, is_active })
+      
+    if (error) return { error: error.message }
+  }
+
+  revalidatePath('/admin')
+  return { success: true }
+}
+
+export async function deleteStudentMeal(id: string) {
+  const supabase = await createClient()
+  if (!(await checkAdmin(supabase))) return { error: 'Geen toegang' }
+
+  const { error } = await supabase
+    .from('student_meals')
+    .delete()
+    .eq('id', id)
+
+  if (error) return { error: error.message }
+  
+  revalidatePath('/admin')
+  return { success: true }
+}

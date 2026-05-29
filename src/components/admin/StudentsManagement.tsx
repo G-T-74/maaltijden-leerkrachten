@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Papa from 'papaparse'
-import { importStudentsCsv, getClassesAndStudents, toggleStudentVisibility, addStudentManually } from '@/app/actions/student_admin'
+import { importStudentsCsv, getClassesAndStudents, toggleStudentVisibility, addStudentManually, getTeachersAndClasses, toggleTeacherClass } from '@/app/actions/student_admin'
 import styles from './StudentsManagement.module.css'
 
 type CsvRow = {
@@ -34,17 +34,32 @@ export default function StudentsManagement({ schoolId }: { schoolId: string }) {
   const [newName, setNewName] = useState('')
   const [addError, setAddError] = useState('')
 
+  // Teachers State
+  const [teachers, setTeachers] = useState<any[]>([])
+  const [links, setLinks] = useState<any[]>([])
+  const [loadingTeachers, setLoadingTeachers] = useState(false)
+
   useEffect(() => {
     loadData()
   }, [schoolId])
 
   const loadData = async () => {
     setLoading(true)
-    const res = await getClassesAndStudents(schoolId)
-    if (res.classes) {
-      setClasses(res.classes)
+    setLoadingTeachers(true)
+    const [res, tRes] = await Promise.all([
+      getClassesAndStudents(schoolId),
+      getTeachersAndClasses(schoolId)
+    ])
+    
+    if (res.classes) setClasses(res.classes)
+    
+    if (tRes.teachers) {
+      setTeachers(tRes.teachers)
+      setLinks(tRes.links || [])
     }
+    
     setLoading(false)
+    setLoadingTeachers(false)
   }
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -235,6 +250,55 @@ export default function StudentsManagement({ schoolId }: { schoolId: string }) {
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* LEERKRACHTEN KOPPELEN SECTIE */}
+      <div className={styles.card}>
+        <h3 className={styles.cardTitle}>Leerkrachten Koppelen aan Klassen</h3>
+        <p className={styles.description}>
+          Bepaald welke klassen zichtbaar zijn in het bestelscherm van elke leerkracht.
+        </p>
+
+        {loadingTeachers ? <p>Laden...</p> : teachers.length === 0 ? (
+          <p className={styles.description}>Geen leerkrachten gevonden voor deze school. Koppel eerst leerkrachten via het profiel of de database.</p>
+        ) : (
+          <div className={styles.tableWrapper}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>Leerkracht</th>
+                  <th>Gekoppelde Klassen (Klik om te (ont)koppelen)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {teachers.map(teacher => (
+                  <tr key={teacher.id}>
+                    <td style={{ fontWeight: 500 }}>{teacher.first_name} {teacher.last_name}</td>
+                    <td>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        {classes.map(cls => {
+                          const isLinked = links.some(l => l.user_id === teacher.id && l.class_id === cls.id)
+                          return (
+                            <button
+                              key={cls.id}
+                              onClick={async () => {
+                                await toggleTeacherClass(teacher.id, cls.id, isLinked)
+                                loadData()
+                              }}
+                              className={`${styles.badgeBtn} ${isLinked ? styles.badgeBtnActive : ''}`}
+                            >
+                              {cls.name}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

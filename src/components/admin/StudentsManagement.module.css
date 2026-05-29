@@ -277,3 +277,32 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+.btnSecondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Badge Buttons for linking */
+.badgeBtn {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.85rem;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+  background-color: var(--background);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.badgeBtn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.badgeBtnActive {
+  background-color: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+.badgeBtnActive:hover {
+  background-color: var(--primary-hover);
+  color: white;
+}

@@ -113,3 +113,71 @@ export async function addStudentManually(classId: string, classNumber: number, f
   revalidatePath('/admin')
   return { success: true }
 }
+
+export async function getTeachersAndClasses(schoolId: string) {
+  const supabase = await createClient()
+  const { isAdmin } = await checkAdmin(supabase)
+  if (!isAdmin) return { error: 'Geen toegang' }
+
+  if (!schoolId) return { teachers: [], classes: [] }
+
+  // 1. Haal leerkrachten op via user_schools koppeling
+  const { data: userSchools } = await supabase
+    .from('user_schools')
+    .select(`
+      user_id,
+      profiles:user_id ( id, first_name, last_name, role )
+    `)
+    .eq('school_id', schoolId)
+
+  // Filter out non-teachers if needed, but profiles with role 'teacher' or just let admins assign anyone
+  const rawTeachers = userSchools?.map((us: any) => Array.isArray(us.profiles) ? us.profiles[0] : us.profiles).filter((p: any) => p && p.role !== 'admin') || []
+  
+  // Sort teachers by name
+  const teachers = rawTeachers.sort((a: any, b: any) => {
+    const nameA = `${a.first_name || ''} ${a.last_name || ''}`.trim()
+    const nameB = `${b.first_name || ''} ${b.last_name || ''}`.trim()
+    return nameA.localeCompare(nameB)
+  })
+
+  // 2. Haal klassen op voor de huidige school
+  const { data: classesData } = await supabase
+    .from('classes')
+    .select('id, name, level')
+    .eq('school_id', schoolId)
+    .order('name')
+
+  // 3. Haal bestaande koppelingen op
+  const { data: existingLinks } = await supabase
+    .from('user_classes')
+    .select('user_id, class_id')
+    
+  return { 
+    teachers: teachers || [], 
+    classes: classesData || [],
+    links: existingLinks || []
+  }
+}
+
+export async function toggleTeacherClass(userId: string, classId: string, currentlyLinked: boolean) {
+  const supabase = await createClient()
+  const { isAdmin } = await checkAdmin(supabase)
+  if (!isAdmin) return { error: 'Geen toegang' }
+
+  if (currentlyLinked) {
+    const { error } = await supabase
+      .from('user_classes')
+      .delete()
+      .eq('user_id', userId)
+      .eq('class_id', classId)
+    if (error) return { error: error.message }
+  } else {
+    const { error } = await supabase
+      .from('user_classes')
+      .insert({ user_id: userId, class_id: classId })
+    if (error) return { error: error.message }
+  }
+
+  revalidatePath('/admin')
+  return { success: true }
+}

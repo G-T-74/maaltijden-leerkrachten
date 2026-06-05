@@ -124,14 +124,21 @@ export async function getTeachersAndClasses(schoolId: string) {
   // 1. Haal leerkrachten op via user_schools koppeling
   const { data: userSchools } = await supabase
     .from('user_schools')
-    .select(`
-      user_id,
-      profiles:user_id ( id, first_name, last_name, role )
-    `)
+    .select('user_id')
     .eq('school_id', schoolId)
 
-  // Filter out non-teachers if needed, but profiles with role 'teacher' or just let admins assign anyone
-  const rawTeachers = userSchools?.map((us: any) => Array.isArray(us.profiles) ? us.profiles[0] : us.profiles).filter((p: any) => p && p.role !== 'admin') || []
+  const userIds = userSchools?.map(us => us.user_id) || []
+
+  let rawTeachers: any[] = []
+  if (userIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, first_name, last_name, role')
+      .in('id', userIds)
+
+    // Neem alle non-admins mee in de lijst, of gebruikers met role NULL/user
+    rawTeachers = profiles?.filter(p => p.role !== 'admin') || []
+  }
   
   // Sort teachers by name
   const teachers = rawTeachers.sort((a: any, b: any) => {

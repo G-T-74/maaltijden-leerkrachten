@@ -14,7 +14,11 @@ async function checkAdmin(supabase: any) {
     .eq('id', user.id)
     .single()
 
-  return { user, isAdmin: profile?.role === 'admin' }
+  return { 
+    user, 
+    isAdmin: profile?.role === 'admin' || profile?.role === 'superadmin',
+    isSuperAdmin: profile?.role === 'superadmin'
+  }
 }
 
 export async function importStudentsCsv(payload: any[]) {
@@ -116,7 +120,7 @@ export async function addStudentManually(classId: string, classNumber: number, f
 
 export async function getTeachersAndClasses(schoolId: string) {
   const supabase = await createClient()
-  const { isAdmin } = await checkAdmin(supabase)
+  const { isAdmin, isSuperAdmin } = await checkAdmin(supabase)
   if (!isAdmin) return { error: 'Geen toegang' }
 
   if (!schoolId) return { teachers: [], classes: [] }
@@ -162,7 +166,8 @@ export async function getTeachersAndClasses(schoolId: string) {
   return { 
     teachers: teachers || [], 
     classes: classesData || [],
-    links: existingLinks || []
+    links: existingLinks || [],
+    isSuperAdmin
   }
 }
 
@@ -191,8 +196,8 @@ export async function toggleTeacherClass(userId: string, classId: string, curren
 
 export async function getAllProfiles(schoolId: string) {
   const supabase = await createClient()
-  const { isAdmin } = await checkAdmin(supabase)
-  if (!isAdmin) return { error: 'Geen toegang' }
+  const { isSuperAdmin } = await checkAdmin(supabase)
+  if (!isSuperAdmin) return { error: 'Geen toegang (enkel superbeheerder)' }
 
   // Haal alle gebruikers op
   const { data: profiles, error } = await supabase
@@ -218,8 +223,8 @@ export async function getAllProfiles(schoolId: string) {
 
 export async function toggleUserSchool(userId: string, schoolId: string, currentlyLinked: boolean) {
   const supabase = await createClient()
-  const { isAdmin } = await checkAdmin(supabase)
-  if (!isAdmin) return { error: 'Geen toegang' }
+  const { isSuperAdmin } = await checkAdmin(supabase)
+  if (!isSuperAdmin) return { error: 'Geen toegang (enkel superbeheerder)' }
 
   if (currentlyLinked) {
     const { error } = await supabase

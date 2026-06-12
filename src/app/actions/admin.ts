@@ -14,7 +14,7 @@ async function checkAdmin(supabase: any) {
     .eq('id', user.id)
     .single()
 
-  return profile?.role === 'admin'
+  return profile?.role === 'admin' || profile?.role === 'superadmin'
 }
 
 export async function getSchoolsWithDeadlines() {

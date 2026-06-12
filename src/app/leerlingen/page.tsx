@@ -18,7 +18,7 @@ export default async function LeerlingenPage() {
     .eq('id', user.id)
     .single()
 
-  const isAdmin = profile?.role === 'admin'
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'superadmin'
 
   const emailPart = user.email ? user.email.split('@')[0] : ''
   const firstName = emailPart ? emailPart.split('.')[0] : ''

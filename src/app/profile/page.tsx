@@ -26,7 +26,7 @@ export default async function ProfilePage() {
     .eq('id', user.id)
     .single()
 
-  const isAdmin = profile?.role === 'admin'
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'superadmin'
 
   // Haal alle beschikbare scholen op
   const { data: schools } = await supabase

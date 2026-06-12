@@ -20,13 +20,10 @@ type Meal = {
 }
 
 type OrderFormProps = {
-  userSchools: { school: School }[]
+  activeSchool: School
 }
 
-export default function OrderForm({ userSchools }: OrderFormProps) {
-  const [selectedSchoolId, setSelectedSchoolId] = useState<string>(
-    userSchools.length > 0 ? userSchools[0].school.id : ''
-  )
+export default function OrderForm({ activeSchool }: OrderFormProps) {
   const [meals, setMeals] = useState<Meal[]>([])
   const [selectedSchoolDetails, setSelectedSchoolDetails] = useState<School | null>(null)
   const [selectedMealId, setSelectedMealId] = useState<string>('')
@@ -54,8 +51,7 @@ export default function OrderForm({ userSchools }: OrderFormProps) {
   useEffect(() => {
     if (orderDate) return // Alleen initiële datum instellen
 
-    const school = userSchools.find(us => us.school.id === selectedSchoolId)?.school
-    const deadline = school?.order_deadline || '08:15:00'
+    const deadline = activeSchool?.order_deadline || '08:15:00'
     const [hours, minutes] = deadline.split(':').map(Number)
 
     const now = new Date()
@@ -76,7 +72,7 @@ export default function OrderForm({ userSchools }: OrderFormProps) {
     
     // Format YYYY-MM-DD
     setOrderDate(defaultDate.toISOString().split('T')[0])
-  }, [selectedSchoolId, userSchools, orderDate])
+  }, [activeSchool, orderDate])
 
   // Check of gekozen datum een weekend is
   const chosenDateObj = orderDate ? new Date(orderDate) : null
@@ -85,10 +81,10 @@ export default function OrderForm({ userSchools }: OrderFormProps) {
   // Fetch meals when school changes
   useEffect(() => {
     async function loadMeals() {
-      if (!selectedSchoolId) return
+      if (!activeSchool) return
       
       setLoading(true)
-      const result = await getMealsForSchool(selectedSchoolId)
+      const result = await getMealsForSchool(activeSchool.id)
       
       if (result.error) {
         setError(result.error)
@@ -111,7 +107,7 @@ export default function OrderForm({ userSchools }: OrderFormProps) {
     }
     
     loadMeals()
-  }, [selectedSchoolId])
+  }, [activeSchool])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -134,45 +130,15 @@ export default function OrderForm({ userSchools }: OrderFormProps) {
 
   return (
     <div className={styles.formContainer}>
-      {selectedSchoolDetails && (
-        <div className={styles.schoolHeader}>
-          {selectedSchoolDetails.logo_url && (
-            <img 
-              src={selectedSchoolDetails.logo_url} 
-              alt={`Logo ${selectedSchoolDetails.name}`} 
-              className={styles.schoolLogo} 
-            />
-          )}
-          <h2 className={styles.schoolName}>{selectedSchoolDetails.name}</h2>
-        </div>
-      )}
 
-      {error && <div className={styles.error}>{error}</div>}
-      {success && <div className={styles.success}>Je bestelling is succesvol geplaatst!</div>}
+      {error && <div className={styles.alertError}>{error}</div>}
+      {success && <div className={styles.alertSuccess}>Bestelling succesvol geplaatst! Je kunt hieronder nog een bestelling plaatsen als je wilt.</div>}
 
       <form onSubmit={handleSubmit}>
+        <input type="hidden" name="school_id" value={activeSchool.id} />
+        
         <div className={styles.formGroup}>
-          <label className={styles.label}>School</label>
-          <select 
-            name="school_id" 
-            className={styles.select}
-            value={selectedSchoolId}
-            onChange={(e) => {
-              setSelectedSchoolId(e.target.value)
-              setSelectedMealId('') // Reset meal selection
-            }}
-            required
-          >
-            {userSchools.map(({ school }) => (
-              <option key={school.id} value={school.id}>
-                {school.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className={styles.formGroup}>
-          <label className={styles.label}>Datum</label>
+          <label htmlFor="date">Voor welke datum bestel je?</label>
           <input 
             type="date" 
             name="order_date" 

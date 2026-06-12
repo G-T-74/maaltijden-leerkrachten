@@ -2,8 +2,9 @@ import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import OrderForm from '@/components/OrderForm'
 import OrderOverview from '@/components/OrderOverview'
+import SchoolHeader from '@/components/SchoolHeader'
 
-export default async function Home() {
+export default async function Home({ searchParams }: { searchParams: { school?: string } }) {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -49,6 +50,14 @@ export default async function Home() {
     school: us.schools
   }))
 
+  const activeSchoolId = searchParams?.school || formattedSchools[0].school.id
+  const activeSchoolDetails = formattedSchools.find(s => s.school.id === activeSchoolId)?.school
+
+  if (!activeSchoolDetails) {
+    // If invalid school id in url, redirect to the first one
+    redirect(`/mijn-maaltijden?school=${formattedSchools[0].school.id}`)
+  }
+
   // Haal de geplaatste bestellingen op (vandaag en in de toekomst, en de afgelopen 30 dagen)
   const thirtyDaysAgo = new Date()
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
@@ -64,18 +73,19 @@ export default async function Home() {
       meals ( id, name, category, caterer_id )
     `)
     .eq('user_id', user.id)
+    .eq('school_id', activeSchoolId)
     .gte('order_date', thirtyDaysAgo.toISOString().split('T')[0])
     .order('order_date', { ascending: false })
 
-  // Haal actieve maaltijden op voor inline-editing (voor de caterers van de geselecteerde scholen)
-  const catererIds = [...new Set(formattedSchools.map(s => s.school.caterer_id).filter(Boolean))]
+  // Haal actieve maaltijden op voor inline-editing (voor de caterer van de geselecteerde school)
+  const catererId = activeSchoolDetails.caterer_id
   let availableMeals: Record<string, any[]> = {}
   
-  if (catererIds.length > 0) {
+  if (catererId) {
     const { data: meals } = await supabase
       .from('meals')
       .select('id, name, category, price, caterer_id')
-      .in('caterer_id', catererIds)
+      .eq('caterer_id', catererId)
       .eq('is_active', true)
       .order('category')
       .order('name')
@@ -133,8 +143,14 @@ export default async function Home() {
       <p style={{ color: 'var(--text-muted)' }}>
         Welkom {capitalizedFirstName ? `${capitalizedFirstName}, je` : 'je'} bent succesvol ingelogd!
       </p>
+
+      <SchoolHeader 
+        userSchools={formattedSchools} 
+        activeSchoolId={activeSchoolId} 
+        basePath="/mijn-maaltijden" 
+      />
       
-      <OrderForm userSchools={formattedSchools} />
+      <OrderForm activeSchool={activeSchoolDetails} />
       
       <OrderOverview orders={(orders as any) || []} availableMeals={availableMeals} />
 

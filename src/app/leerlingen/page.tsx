@@ -1,8 +1,9 @@
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import StudentOrdersClient from '@/components/student-meals/StudentOrdersClient'
+import SchoolHeader from '@/components/SchoolHeader'
 
-export default async function LeerlingenPage() {
+export default async function LeerlingenPage({ searchParams }: { searchParams: { school?: string } }) {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -23,6 +24,36 @@ export default async function LeerlingenPage() {
   const emailPart = user.email ? user.email.split('@')[0] : ''
   const firstName = emailPart ? emailPart.split('.')[0] : ''
   const capitalizedFirstName = firstName ? firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase() : ''
+
+  // Check of de gebruiker al scholen heeft geselecteerd en haal details op
+  const { data: userSchools } = await supabase
+    .from('user_schools')
+    .select(`
+      school_id,
+      schools (
+        id,
+        name,
+        caterer_id,
+        logo_url,
+        order_deadline
+      )
+    `)
+    .eq('user_id', user.id)
+
+  if (!userSchools || userSchools.length === 0) {
+    redirect('/profile')
+  }
+  
+  const formattedSchools = userSchools.map((us: any) => ({
+    school: us.schools
+  }))
+
+  const activeSchoolId = searchParams?.school || formattedSchools[0].school.id
+  const activeSchoolDetails = formattedSchools.find(s => s.school.id === activeSchoolId)?.school
+
+  if (!activeSchoolDetails) {
+    redirect(`/leerlingen?school=${formattedSchools[0].school.id}`)
+  }
 
   return (
     <main style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto', position: 'relative' }}>
@@ -68,8 +99,14 @@ export default async function LeerlingenPage() {
         Welkom {capitalizedFirstName ? `${capitalizedFirstName}, beheer` : 'beheer'} hier de bestellingen voor je klas(sen).
       </p>
 
+      <SchoolHeader 
+        userSchools={formattedSchools} 
+        activeSchoolId={activeSchoolId} 
+        basePath="/leerlingen" 
+      />
+
       <div style={{ marginTop: '2rem' }}>
-        <StudentOrdersClient />
+        <StudentOrdersClient activeSchoolId={activeSchoolId} />
       </div>
     </main>
   )

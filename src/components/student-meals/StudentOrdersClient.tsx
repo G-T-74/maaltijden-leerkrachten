@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { getTeacherClasses, getStudentOrderMatrix, saveStudentOrdersBulk, copyPreviousStudentOrders } from '@/app/actions/student_order'
 import styles from './StudentOrdersClient.module.css'
 
-export default function StudentOrdersClient() {
+export default function StudentOrdersClient({ activeSchoolId }: { activeSchoolId: string }) {
   const [classes, setClasses] = useState<any[]>([])
   const [activeClassId, setActiveClassId] = useState<string>('')
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0])
@@ -24,13 +24,22 @@ export default function StudentOrdersClient() {
     async function loadClasses() {
       const res = await getTeacherClasses()
       if (res.classes && res.classes.length > 0) {
-        setClasses(res.classes)
-        setActiveClassId(res.classes[0].id)
+        // Filter classes op de actieve school!
+        const filteredClasses = res.classes.filter((c: any) => c.school_id === activeSchoolId)
+        setClasses(filteredClasses)
+        if (filteredClasses.length > 0) {
+          setActiveClassId(filteredClasses[0].id)
+        } else {
+          setActiveClassId('')
+        }
+      } else {
+        setClasses([])
+        setActiveClassId('')
       }
       setLoading(false)
     }
     loadClasses()
-  }, [])
+  }, [activeSchoolId])
 
   // 2. Haal matrix op als class of date wijzigt
   useEffect(() => {

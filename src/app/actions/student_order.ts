@@ -10,11 +10,18 @@ export async function getTeacherClasses() {
   if (!user) return { error: 'Niet ingelogd' }
 
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  const isAdmin = profile?.role === 'admin'
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'superadmin'
 
   if (isAdmin) {
-    const { data: adminSchools } = await supabase.from('user_schools').select('school_id').eq('user_id', user.id)
-    const schoolIds = adminSchools?.map(s => s.school_id) || []
+    let schoolIds: string[] = []
+    
+    if (profile?.role === 'superadmin') {
+      const { data: allSchools } = await supabase.from('schools').select('id')
+      schoolIds = allSchools?.map(s => s.id) || []
+    } else {
+      const { data: adminSchools } = await supabase.from('user_schools').select('school_id').eq('user_id', user.id)
+      schoolIds = adminSchools?.map(s => s.school_id) || []
+    }
 
     if (schoolIds.length > 0) {
       const { data: allClasses, error: classErr } = await supabase

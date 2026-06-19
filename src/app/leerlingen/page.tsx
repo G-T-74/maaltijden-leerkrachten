@@ -3,7 +3,8 @@ import { redirect } from 'next/navigation'
 import StudentOrdersClient from '@/components/student-meals/StudentOrdersClient'
 import SchoolHeader from '@/components/SchoolHeader'
 
-export default async function LeerlingenPage({ searchParams }: { searchParams: { school?: string } }) {
+export default async function LeerlingenPage(props: { searchParams: Promise<{ school?: string }> }) {
+  const searchParams = await props.searchParams
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()

@@ -27,7 +27,7 @@ export default function SchoolHeader({ userSchools, activeSchoolId, basePath }: 
     const newSchoolId = e.target.value
     const currentParams = new URLSearchParams(Array.from(searchParams.entries()))
     currentParams.set('school', newSchoolId)
-    router.push(`${basePath}?${currentParams.toString()}`)
+    window.location.assign(`${basePath}?${currentParams.toString()}`)
   }
 
   if (userSchools.length === 0) return null

@@ -4,7 +4,8 @@ import OrderForm from '@/components/OrderForm'
 import OrderOverview from '@/components/OrderOverview'
 import SchoolHeader from '@/components/SchoolHeader'
 
-export default async function Home({ searchParams }: { searchParams: { school?: string } }) {
+export default async function Home(props: { searchParams: Promise<{ school?: string }> }) {
+  const searchParams = await props.searchParams
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()

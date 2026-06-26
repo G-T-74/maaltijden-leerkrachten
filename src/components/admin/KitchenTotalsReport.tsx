@@ -81,7 +81,7 @@ export default function KitchenTotalsReport({ schoolId }: { schoolId: string }) 
             .select(`
               student_id,
               quantity,
-              student_meals ( id, name, category )
+              student_meals ( id, name )
             `)
             .in('student_id', studentIds)
             .eq('order_date', date)
@@ -110,8 +110,15 @@ export default function KitchenTotalsReport({ schoolId }: { schoolId: string }) 
 
       studentOrdersData?.forEach((order: any) => {
         const name = order.student_meals?.name
-        const category = order.student_meals?.category || 'Andere'
         if (!name) return
+
+        // Probeer categorie te matchen met een bestaande leerkrachtmaaltijd (als die vandaag besteld is)
+        let category = 'Leerling Maaltijden'
+        const existingKey = Object.keys(grouped).find(k => grouped[k].mealName === name)
+        if (existingKey) {
+          category = grouped[existingKey].category
+        }
+
         const key = `${category}_${name}`
         if (!grouped[key]) {
           grouped[key] = { mealName: name, category, totalTeachers: 0, totalStudentsNormal: 0, totalStudentsToddler: 0 }

@@ -8,6 +8,7 @@ type School = {
   id: string
   name: string
   order_deadline: string | null
+  apply_toddler_factor: boolean
 }
 
 export default function SchoolSettings() {
@@ -18,6 +19,7 @@ export default function SchoolSettings() {
 
   // Local state for editing deadlines
   const [deadlines, setDeadlines] = useState<Record<string, string>>({})
+  const [toddlerFactors, setToddlerFactors] = useState<Record<string, boolean>>({})
   const [savingId, setSavingId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -28,6 +30,7 @@ export default function SchoolSettings() {
       } else if (res.schools) {
         setSchools(res.schools)
         const initialDeadlines: Record<string, string> = {}
+        const initialFactors: Record<string, boolean> = {}
         res.schools.forEach((s: School) => {
           // Format time to HH:MM if it has seconds
           let dl = s.order_deadline || '08:15:00'
@@ -35,8 +38,10 @@ export default function SchoolSettings() {
             dl = dl.substring(0, 5)
           }
           initialDeadlines[s.id] = dl
+          initialFactors[s.id] = s.apply_toddler_factor || false
         })
         setDeadlines(initialDeadlines)
+        setToddlerFactors(initialFactors)
       }
       setLoading(false)
     }
@@ -45,6 +50,10 @@ export default function SchoolSettings() {
 
   const handleDeadlineChange = (schoolId: string, val: string) => {
     setDeadlines(prev => ({ ...prev, [schoolId]: val }))
+  }
+
+  const handleFactorChange = (schoolId: string, checked: boolean) => {
+    setToddlerFactors(prev => ({ ...prev, [schoolId]: checked }))
   }
 
   const handleSave = async (schoolId: string) => {
@@ -59,8 +68,13 @@ export default function SchoolSettings() {
     }
 
     const res = await updateSchoolDeadline(schoolId, timeToSave)
-    if (res.error) {
-      setError(res.error)
+    
+    // Also save the toddler factor
+    const { updateSchoolToddlerFactor } = await import('@/app/actions/admin')
+    const resFactor = await updateSchoolToddlerFactor(schoolId, toddlerFactors[schoolId])
+
+    if (res.error || resFactor.error) {
+      setError(res.error || resFactor.error || 'Er is een fout opgetreden.')
     } else {
       setSuccessMsg('Deadline succesvol opgeslagen.')
       setTimeout(() => setSuccessMsg(null), 3000)
@@ -88,6 +102,7 @@ export default function SchoolSettings() {
             <tr>
               <th>School</th>
               <th>Bestel Deadline</th>
+              <th>Kleuterfactor (2/3) toepassen</th>
               <th>Actie</th>
             </tr>
           </thead>
@@ -104,6 +119,17 @@ export default function SchoolSettings() {
                   />
                 </td>
                 <td>
+                  <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '0.5rem' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={toddlerFactors[school.id] || false}
+                      onChange={e => handleFactorChange(school.id, e.target.checked)}
+                      style={{ width: '1.2rem', height: '1.2rem' }}
+                    />
+                    <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Toepassen</span>
+                  </label>
+                </td>
+                <td>
                   <button 
                     className={styles.btn}
                     onClick={() => handleSave(school.id)}
@@ -116,7 +142,7 @@ export default function SchoolSettings() {
             ))}
             {schools.length === 0 && (
               <tr>
-                <td colSpan={3} style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
+                <td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
                   Geen scholen gevonden.
                 </td>
               </tr>

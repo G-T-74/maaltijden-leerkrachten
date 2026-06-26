@@ -25,21 +25,29 @@ export async function getSchoolsWithDeadlines() {
   // Haal gekoppelde scholen en de actieve school op uit het profiel
   const { data: profile } = await supabase
     .from('profiles')
-    .select('active_admin_school_id')
+    .select('active_admin_school_id, role')
     .eq('id', user.id)
     .single()
 
-  const { data: userSchools } = await supabase
-    .from('user_schools')
-    .select('school_id')
-    .eq('user_id', user.id)
+  let schoolIds: string[] = []
+  const isSuperAdmin = profile?.role === 'superadmin'
 
-  const schoolIds = userSchools?.map(us => us.school_id) || []
+  if (isSuperAdmin) {
+    const { data: allSchools } = await supabase.from('schools').select('id')
+    schoolIds = allSchools?.map(s => s.id) || []
+  } else {
+    const { data: userSchools } = await supabase
+      .from('user_schools')
+      .select('school_id')
+      .eq('user_id', user.id)
+    schoolIds = userSchools?.map(us => us.school_id) || []
+  }
+
   if (schoolIds.length === 0) return { schools: [], activeSchoolId: null }
 
   const { data, error } = await supabase
     .from('schools')
-    .select('id, name, order_deadline, caterer_id')
+    .select('id, name, order_deadline, caterer_id, apply_toddler_factor')
     .in('id', schoolIds)
     .order('name')
 
@@ -74,6 +82,21 @@ export async function updateSchoolDeadline(schoolId: string, deadline: string) {
   
   revalidatePath('/admin')
   revalidatePath('/')
+  return { success: true }
+}
+
+export async function updateSchoolToddlerFactor(schoolId: string, apply: boolean) {
+  const supabase = await createClient()
+  if (!(await checkAdmin(supabase))) return { error: 'Geen toegang' }
+
+  const { error } = await supabase
+    .from('schools')
+    .update({ apply_toddler_factor: apply })
+    .eq('id', schoolId)
+
+  if (error) return { error: error.message }
+  
+  revalidatePath('/admin')
   return { success: true }
 }
 

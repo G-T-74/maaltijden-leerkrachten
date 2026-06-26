@@ -8,12 +8,14 @@ export default function KitchenTotalsReport({ schoolId }: { schoolId: string }) 
   const [totals, setTotals] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [applyFactor, setApplyFactor] = useState(false)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   const supabase = createClient()
 
   useEffect(() => {
     async function fetchTotals() {
       setLoading(true)
+      setErrorMsg(null)
       
       // 1. Check of toddler factor actief is
       const { data: schoolData } = await supabase
@@ -26,7 +28,7 @@ export default function KitchenTotalsReport({ schoolId }: { schoolId: string }) 
       setApplyFactor(factorActive)
 
       // 2. Haal leerkracht bestellingen op
-      const { data: teacherOrders } = await supabase
+      const { data: teacherOrders, error: teacherErr } = await supabase
         .from('orders')
         .select(`
           quantity,
@@ -35,11 +37,21 @@ export default function KitchenTotalsReport({ schoolId }: { schoolId: string }) 
         .eq('order_date', date)
         .eq('school_id', schoolId)
 
+      if (teacherErr) {
+        console.error("Teacher orders error:", teacherErr)
+        setErrorMsg(prev => (prev ? prev + ' | ' : '') + 'Teacher Orders Error: ' + teacherErr.message)
+      }
+
       // 3. Haal klassen en studenten op voor deze school
-      const { data: classes } = await supabase
+      const { data: classes, error: classErr } = await supabase
         .from('classes')
         .select('id, level')
         .eq('school_id', schoolId)
+      
+      if (classErr) {
+        console.error("Classes error:", classErr)
+        setErrorMsg(prev => (prev ? prev + ' | ' : '') + 'Classes Error: ' + classErr.message)
+      }
       
       const classIds = classes?.map(c => c.id) || []
       
@@ -50,16 +62,21 @@ export default function KitchenTotalsReport({ schoolId }: { schoolId: string }) 
         const classLevelMap: Record<string, string> = {}
         classes?.forEach(c => classLevelMap[c.id] = c.level)
 
-        const { data: students } = await supabase
+        const { data: students, error: studErr } = await supabase
           .from('students')
           .select('id, class_id')
           .in('class_id', classIds)
+        
+        if (studErr) {
+          console.error("Students error:", studErr)
+          setErrorMsg(prev => (prev ? prev + ' | ' : '') + 'Students Error: ' + studErr.message)
+        }
         
         const studentIds = students?.map(s => s.id) || []
         students?.forEach(s => studentsMap[s.id] = classLevelMap[s.class_id])
         
         if (studentIds.length > 0) {
-          const { data } = await supabase
+          const { data, error: soErr } = await supabase
             .from('student_orders')
             .select(`
               student_id,
@@ -69,6 +86,10 @@ export default function KitchenTotalsReport({ schoolId }: { schoolId: string }) 
             .in('student_id', studentIds)
             .eq('order_date', date)
             
+          if (soErr) {
+            console.error("Student orders error:", soErr)
+            setErrorMsg(prev => (prev ? prev + ' | ' : '') + 'Student Orders Error: ' + soErr.message)
+          }
           studentOrdersData = data || []
         }
       }
@@ -155,6 +176,12 @@ export default function KitchenTotalsReport({ schoolId }: { schoolId: string }) 
           style={{ maxWidth: '300px' }}
         />
       </div>
+
+      {errorMsg && (
+        <div style={{ backgroundColor: 'rgba(255,0,0,0.1)', color: 'red', padding: '1rem', marginBottom: '1rem', borderRadius: '8px' }}>
+          <strong>Error loading data:</strong> {errorMsg}
+        </div>
+      )}
 
       {loading ? (
         <p>Laden...</p>

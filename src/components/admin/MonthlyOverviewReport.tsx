@@ -10,6 +10,8 @@ export default function MonthlyOverviewReport({ schoolId }: { schoolId: string }
   })
   const [compactView, setCompactView] = useState(false)
   const [orders, setOrders] = useState<any[]>([])
+  const [studentOrders, setStudentOrders] = useState<any[]>([])
+  const [studentsMap, setStudentsMap] = useState<Record<string, { name: string, className: string, level: string }>>({})
   const [loading, setLoading] = useState(true)
 
   const supabase = createClient()
@@ -41,6 +43,55 @@ export default function MonthlyOverviewReport({ schoolId }: { schoolId: string }
       if (data) {
         setOrders(data)
       }
+
+      // Haal studenten bestellingen op
+      const { data: classes } = await supabase
+        .from('classes')
+        .select('id, name, level')
+        .eq('school_id', schoolId)
+        
+      const classIds = classes?.map(c => c.id) || []
+      let sOrders: any[] = []
+      let sMap: Record<string, { name: string, className: string, level: string }> = {}
+
+      if (classIds.length > 0) {
+        const { data: students } = await supabase
+          .from('students')
+          .select('id, class_id, first_name, last_name')
+          .in('class_id', classIds)
+        
+        students?.forEach(s => {
+          const cls = classes?.find(c => c.id === s.class_id)
+          sMap[s.id] = {
+            name: `${s.first_name || ''} ${s.last_name || ''}`.trim() || 'Onbekend',
+            className: cls?.name || 'Onbekend',
+            level: cls?.level || 'lager'
+          }
+        })
+        
+        const studentIds = students?.map(s => s.id) || []
+        if (studentIds.length > 0) {
+          const { data } = await supabase
+            .from('student_orders')
+            .select(`
+              id,
+              order_date,
+              quantity,
+              price_at_order,
+              student_id,
+              student_meals ( name )
+            `)
+            .in('student_id', studentIds)
+            .gte('order_date', startDate)
+            .lte('order_date', endDate)
+            .order('order_date', { ascending: true })
+            
+          sOrders = data || []
+        }
+      }
+
+      setStudentOrders(sOrders)
+      setStudentsMap(sMap)
       setLoading(false)
     }
 
@@ -63,6 +114,29 @@ export default function MonthlyOverviewReport({ schoolId }: { schoolId: string }
     // Sorteer op naam
     return Object.values(grouped).sort((a, b) => a.name.localeCompare(b.name))
   }, [orders])
+
+  // Groepeer op leerling
+  const groupedByStudent = useMemo(() => {
+    const grouped: Record<string, { className: string, studentName: string, orders: any[], total: number }> = {}
+    
+    studentOrders.forEach(order => {
+      const studentInfo = studentsMap[order.student_id]
+      if (!studentInfo) return
+      
+      const key = `${studentInfo.className}_${order.student_id}`
+      if (!grouped[key]) {
+        grouped[key] = { className: studentInfo.className, studentName: studentInfo.name, orders: [], total: 0 }
+      }
+      grouped[key].orders.push(order)
+      grouped[key].total += order.quantity * order.price_at_order
+    })
+    
+    // Sort by class name, then student name
+    return Object.values(grouped).sort((a, b) => {
+      if (a.className !== b.className) return a.className.localeCompare(b.className)
+      return a.studentName.localeCompare(b.studentName)
+    })
+  }, [studentOrders, studentsMap])
 
   return (
     <div>
@@ -94,10 +168,13 @@ export default function MonthlyOverviewReport({ schoolId }: { schoolId: string }
 
       {loading ? (
         <p>Laden...</p>
-      ) : groupedByTeacher.length === 0 ? (
+      ) : groupedByTeacher.length === 0 && groupedByStudent.length === 0 ? (
         <p style={{ color: 'var(--text-muted)' }}>Geen bestellingen gevonden voor deze maand.</p>
       ) : compactView ? (
-        <div style={{ overflowX: 'auto', backgroundColor: 'var(--surface)', padding: '1.5rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+          <div>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '1rem', color: 'var(--text-main)' }}>Facturatie Leerkrachten</h3>
+            <div style={{ overflowX: 'auto', backgroundColor: 'var(--surface)', padding: '1.5rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--border)' }}>
@@ -114,9 +191,40 @@ export default function MonthlyOverviewReport({ schoolId }: { schoolId: string }
               ))}
             </tbody>
           </table>
+          </div>
+          
+          {groupedByStudent.length > 0 && (
+            <div>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '1rem', color: 'var(--text-main)' }}>Facturatie Leerlingen</h3>
+              <div style={{ overflowX: 'auto', backgroundColor: 'var(--surface)', padding: '1.5rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid var(--border)' }}>
+                      <th style={{ padding: '1rem', color: 'var(--text-muted)' }}>Klas</th>
+                      <th style={{ padding: '1rem', color: 'var(--text-muted)' }}>Naam Leerling</th>
+                      <th style={{ padding: '1rem', color: 'var(--text-muted)', textAlign: 'right' }}>Te factureren bedrag</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {groupedByStudent.map((student, idx) => (
+                      <tr key={idx} style={{ borderBottom: '1px solid var(--border)' }}>
+                        <td style={{ padding: '1rem', fontWeight: '500' }}>{student.className}</td>
+                        <td style={{ padding: '1rem' }}>{student.studentName}</td>
+                        <td style={{ padding: '1rem', fontWeight: 'bold', textAlign: 'right' }}>€{student.total.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem' }}>
+          
+          <div>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '1rem', color: 'var(--text-main)', borderBottom: '2px solid var(--border)', paddingBottom: '0.5rem' }}>Details Leerkrachten</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
           {groupedByTeacher.map(teacher => (
             <div key={teacher.name} style={{ backgroundColor: 'var(--surface)', padding: '1.5rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>
@@ -156,6 +264,56 @@ export default function MonthlyOverviewReport({ schoolId }: { schoolId: string }
               </table>
             </div>
           ))}
+          </div>
+          </div>
+
+          {groupedByStudent.length > 0 && (
+            <div>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '1rem', color: 'var(--text-main)', borderBottom: '2px solid var(--border)', paddingBottom: '0.5rem' }}>Details Leerlingen</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                {groupedByStudent.map((student, idx) => (
+                  <div key={idx} style={{ backgroundColor: 'var(--surface)', padding: '1.5rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>
+                      <h3 style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{student.studentName} <span style={{fontSize: '0.9rem', color: 'var(--text-muted)'}}>({student.className})</span></h3>
+                      <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--primary)' }}>
+                        Totaal: €{student.total.toFixed(2)}
+                      </div>
+                    </div>
+                    
+                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+                      <thead>
+                        <tr>
+                          <th style={{ padding: '0.5rem', color: 'var(--text-muted)' }}>Datum</th>
+                          <th style={{ padding: '0.5rem', color: 'var(--text-muted)' }}>Maaltijd</th>
+                          <th style={{ padding: '0.5rem', color: 'var(--text-muted)' }}>Aantal</th>
+                          <th style={{ padding: '0.5rem', color: 'var(--text-muted)' }}>Prijs</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {student.orders.map(order => (
+                          <tr key={order.id}>
+                            <td style={{ padding: '0.5rem', borderBottom: '1px solid var(--border)' }}>
+                              {new Date(order.order_date).toLocaleDateString('nl-BE')}
+                            </td>
+                            <td style={{ padding: '0.5rem', borderBottom: '1px solid var(--border)' }}>
+                              {order.student_meals?.name}
+                            </td>
+                            <td style={{ padding: '0.5rem', borderBottom: '1px solid var(--border)' }}>
+                              {order.quantity}
+                            </td>
+                            <td style={{ padding: '0.5rem', borderBottom: '1px solid var(--border)' }}>
+                              €{(order.quantity * order.price_at_order).toFixed(2)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
         </div>
       )}
     </div>

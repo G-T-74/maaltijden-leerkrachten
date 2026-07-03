@@ -69,7 +69,7 @@ export default function MonthlyOverviewReport({ schoolId }: { schoolId: string }
       if (classIds.length > 0) {
         const { data: students, error: studErr } = await supabase
           .from('students')
-          .select('id, class_id, first_name, last_name')
+          .select('id, class_id, first_name')
           .in('class_id', classIds)
         
         if (studErr) {
@@ -80,7 +80,7 @@ export default function MonthlyOverviewReport({ schoolId }: { schoolId: string }
         students?.forEach(s => {
           const cls = classes?.find(c => c.id === s.class_id)
           sMap[s.id] = {
-            name: `${s.first_name || ''} ${s.last_name || ''}`.trim() || 'Onbekend',
+            name: `${s.first_name || ''}`.trim() || 'Onbekend',
             className: cls?.name || 'Onbekend',
             level: cls?.level || 'lager'
           }

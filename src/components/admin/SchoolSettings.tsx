@@ -219,7 +219,7 @@ export default function SchoolSettings() {
                 <div style={{ display: 'flex', gap: '1rem' }}>
                   <button 
                     className={styles.btn} 
-                    style={{ backgroundColor: 'var(--text-main)', color: 'var(--bg-main)' }}
+                    style={{ backgroundColor: 'var(--text-main)', color: 'var(--background)' }}
                     onClick={() => handleExport(school.id, school.name)}
                   >
                     1. Download Jaaroverzicht (CSV)

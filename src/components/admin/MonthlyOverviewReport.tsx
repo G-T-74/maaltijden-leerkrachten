@@ -13,6 +13,7 @@ export default function MonthlyOverviewReport({ schoolId }: { schoolId: string }
   const [studentOrders, setStudentOrders] = useState<any[]>([])
   const [studentsMap, setStudentsMap] = useState<Record<string, { name: string, className: string, level: string }>>({})
   const [loading, setLoading] = useState(true)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   const supabase = createClient()
 
@@ -20,6 +21,7 @@ export default function MonthlyOverviewReport({ schoolId }: { schoolId: string }
     async function fetchMonthlyOrders() {
       if (!month) return
       setLoading(true)
+      setErrorMsg(null)
       
       const [year, monthNum] = month.split('-')
       const startDate = `${year}-${monthNum}-01`
@@ -40,25 +42,40 @@ export default function MonthlyOverviewReport({ schoolId }: { schoolId: string }
         .eq('school_id', schoolId)
         .order('order_date', { ascending: true })
 
+      if (error) {
+        console.error("Teacher orders error:", error)
+        setErrorMsg(prev => (prev ? prev + ' | ' : '') + 'Teacher Orders Error: ' + error.message)
+      }
+
       if (data) {
         setOrders(data)
       }
 
       // Haal studenten bestellingen op
-      const { data: classes } = await supabase
+      const { data: classes, error: classErr } = await supabase
         .from('classes')
         .select('id, name, level')
         .eq('school_id', schoolId)
+        
+      if (classErr) {
+        console.error("Classes error:", classErr)
+        setErrorMsg(prev => (prev ? prev + ' | ' : '') + 'Classes Error: ' + classErr.message)
+      }
         
       const classIds = classes?.map(c => c.id) || []
       let sOrders: any[] = []
       let sMap: Record<string, { name: string, className: string, level: string }> = {}
 
       if (classIds.length > 0) {
-        const { data: students } = await supabase
+        const { data: students, error: studErr } = await supabase
           .from('students')
           .select('id, class_id, first_name, last_name')
           .in('class_id', classIds)
+        
+        if (studErr) {
+          console.error("Students error:", studErr)
+          setErrorMsg(prev => (prev ? prev + ' | ' : '') + 'Students Error: ' + studErr.message)
+        }
         
         students?.forEach(s => {
           const cls = classes?.find(c => c.id === s.class_id)
@@ -71,7 +88,7 @@ export default function MonthlyOverviewReport({ schoolId }: { schoolId: string }
         
         const studentIds = students?.map(s => s.id) || []
         if (studentIds.length > 0) {
-          const { data } = await supabase
+          const { data, error: soErr } = await supabase
             .from('student_orders')
             .select(`
               id,
@@ -86,6 +103,10 @@ export default function MonthlyOverviewReport({ schoolId }: { schoolId: string }
             .lte('order_date', endDate)
             .order('order_date', { ascending: true })
             
+          if (soErr) {
+            console.error("Student orders error:", soErr)
+            setErrorMsg(prev => (prev ? prev + ' | ' : '') + 'Student Orders Error: ' + soErr.message)
+          }
           sOrders = data || []
         }
       }
@@ -166,6 +187,12 @@ export default function MonthlyOverviewReport({ schoolId }: { schoolId: string }
         </div>
       </div>
 
+      {errorMsg && (
+        <div style={{ backgroundColor: 'rgba(255,0,0,0.1)', color: 'red', padding: '1rem', marginBottom: '1rem', borderRadius: '8px' }}>
+          <strong>Error loading data:</strong> {errorMsg}
+        </div>
+      )}
+
       {loading ? (
         <p>Laden...</p>
       ) : groupedByTeacher.length === 0 && groupedByStudent.length === 0 ? (
@@ -191,6 +218,7 @@ export default function MonthlyOverviewReport({ schoolId }: { schoolId: string }
               ))}
             </tbody>
           </table>
+          </div>
           </div>
           
           {groupedByStudent.length > 0 && (

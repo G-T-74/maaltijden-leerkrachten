@@ -98,10 +98,10 @@ export default async function LeerlingenPage(props: { searchParams: Promise<{ sc
       </div>
 
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '1rem' }}>
-        <a href="/leerlingen" className="btn" style={{ backgroundColor: 'var(--primary)', color: 'white' }}>
+        <a href={`/leerlingen?school=${activeSchoolId}`} className="btn" style={{ backgroundColor: 'var(--primary)', color: 'white' }}>
           Leerlingenmaaltijden
         </a>
-        <a href="/mijn-maaltijden" className="btn" style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-main)' }}>
+        <a href={`/mijn-maaltijden?school=${activeSchoolId}`} className="btn" style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-main)' }}>
           Mijn Maaltijden
         </a>
       </div>

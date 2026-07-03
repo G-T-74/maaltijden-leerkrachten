@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getSchoolsWithDeadlines, updateSchoolDeadline } from '@/app/actions/admin'
+import { getSchoolsWithDeadlines, updateSchoolDeadline, exportYearlyData, resetSchoolYear } from '@/app/actions/admin'
 import styles from './SchoolSettings.module.css'
 
 type School = {
@@ -21,6 +21,13 @@ export default function SchoolSettings() {
   const [deadlines, setDeadlines] = useState<Record<string, string>>({})
   const [toddlerFactors, setToddlerFactors] = useState<Record<string, boolean>>({})
   const [savingId, setSavingId] = useState<string | null>(null)
+  const [resettingId, setResettingId] = useState<string | null>(null)
+  
+  // Controleer of we in de toegestane periode zitten (25 juni t.e.m. 15 juli)
+  const now = new Date();
+  const currentMonth = now.getMonth(); // 0=Jan, 5=Jun, 6=Jul
+  const currentDay = now.getDate();
+  const isResetAllowed = (currentMonth === 5 && currentDay >= 25) || (currentMonth === 6 && currentDay <= 15);
 
   useEffect(() => {
     async function loadData() {
@@ -80,6 +87,51 @@ export default function SchoolSettings() {
       setTimeout(() => setSuccessMsg(null), 3000)
     }
     setSavingId(null)
+  }
+
+  const handleExport = async (schoolId: string, schoolName: string) => {
+    try {
+      setSuccessMsg('Export wordt gegenereerd...')
+      const res = await exportYearlyData(schoolId)
+      if (res.error) {
+        setError(res.error)
+        return
+      }
+      if (res.csv) {
+        const blob = new Blob([res.csv], { type: 'text/csv;charset=utf-8;' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.setAttribute('download', `Jaaroverzicht_${schoolName.replace(/\s+/g, '_')}_${new Date().getFullYear()}.csv`)
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        setSuccessMsg('Export succesvol gedownload.')
+        setTimeout(() => setSuccessMsg(null), 3000)
+      }
+    } catch (err: any) {
+      setError(err.message || 'Fout bij export.')
+    }
+  }
+
+  const handleReset = async (schoolId: string, schoolName: string) => {
+    const userInput = prompt(`Gevaar! Je staat op het punt het schooljaar af te sluiten voor ${schoolName}. Dit verwijdert alle bestellingen en leerlingen (maar behoudt leerkrachten, maaltijden en klassen). Typ de naam van de school ("${schoolName}") om te bevestigen:`)
+    if (userInput !== schoolName) {
+      alert('Actie geannuleerd. Schoolnaam kwam niet overeen.')
+      return
+    }
+
+    setResettingId(schoolId)
+    setError(null)
+    setSuccessMsg(null)
+
+    const res = await resetSchoolYear(schoolId)
+    if (res.error) {
+      setError(res.error)
+    } else {
+      alert('Schooljaar succesvol afgesloten! Alle leerlingen en bestellingen zijn gewist.')
+    }
+    setResettingId(null)
   }
 
   if (loading) return <div>Laden...</div>
@@ -150,6 +202,42 @@ export default function SchoolSettings() {
           </tbody>
         </table>
       </div>
+
+      {isResetAllowed && (
+        <div style={{ marginTop: '4rem', padding: '2rem', border: '1px solid var(--primary)', borderRadius: '8px', backgroundColor: 'rgba(255,59,48,0.05)' }}>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem', color: 'var(--primary)' }}>
+            Gevaarlijke Acties (Schooljaar Afsluiten)
+          </h2>
+          <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
+            Deze acties zijn enkel zichtbaar tussen 25 juni en 15 juli. Download EERST het volledige jaaroverzicht voor de boekhouding. Sluit pas daarna het schooljaar af. Bij het afsluiten worden alle leerlingen en bestellingen permanent gewist. Klassen en leerkrachten blijven behouden.
+          </p>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            {schools.map(school => (
+              <div key={school.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', backgroundColor: 'var(--surface)', borderRadius: '6px', border: '1px solid var(--border)' }}>
+                <div style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>{school.name}</div>
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                  <button 
+                    className={styles.btn} 
+                    style={{ backgroundColor: 'var(--text-main)', color: 'var(--bg-main)' }}
+                    onClick={() => handleExport(school.id, school.name)}
+                  >
+                    1. Download Jaaroverzicht (CSV)
+                  </button>
+                  <button 
+                    className={styles.btn} 
+                    style={{ backgroundColor: 'var(--primary)' }}
+                    onClick={() => handleReset(school.id, school.name)}
+                    disabled={resettingId === school.id}
+                  >
+                    {resettingId === school.id ? 'Bezig...' : '2. Schooljaar Resetten'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

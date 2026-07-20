@@ -170,7 +170,9 @@ export default async function Home(props: { searchParams: Promise<{ school?: str
         basePath="/mijn-maaltijden" 
       />
       
-      <SyncSchoolCookie activeSchoolId={activeSchoolId} />`n`n      <OrderForm activeSchool={activeSchoolDetails} />
+      <SyncSchoolCookie activeSchoolId={activeSchoolId} />
+      
+      <OrderForm activeSchool={activeSchoolDetails} />
       
       <OrderOverview orders={(orders as any) || []} availableMeals={availableMeals} />
 

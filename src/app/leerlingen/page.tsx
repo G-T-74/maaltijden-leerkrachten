@@ -126,7 +126,9 @@ export default async function LeerlingenPage(props: { searchParams: Promise<{ sc
       />
 
       <div style={{ marginTop: '2rem' }}>
-        <SyncSchoolCookie activeSchoolId={activeSchoolId} />`n`n      <StudentOrdersClient activeSchoolId={activeSchoolId} />
+        <SyncSchoolCookie activeSchoolId={activeSchoolId} />
+
+        <StudentOrdersClient activeSchoolId={activeSchoolId} />
       </div>
     </main>
   )

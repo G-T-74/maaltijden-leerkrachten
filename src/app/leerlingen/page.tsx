@@ -1,7 +1,11 @@
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
+import { cookies } from 'next/headers'
 import StudentOrdersClient from '@/components/student-meals/StudentOrdersClient'
 import SchoolHeader from '@/components/SchoolHeader'
+import SyncSchoolCookie from '@/components/SyncSchoolCookie'
+import NavigationTabs from '@/components/NavigationTabs'
 
 export default async function LeerlingenPage(props: { searchParams: Promise<{ school?: string }> }) {
   const searchParams = await props.searchParams
@@ -62,7 +66,16 @@ export default async function LeerlingenPage(props: { searchParams: Promise<{ sc
     school: us.schools
   }))
 
-  const activeSchoolId = searchParams?.school || formattedSchools[0].school.id
+  const cookieStore = await cookies()
+  const cookieSchoolId = cookieStore.get('activeSchoolId')?.value
+
+  let activeSchoolId = searchParams?.school || cookieSchoolId || formattedSchools[0].school.id
+  
+  // If the active school from cookie/url doesn't exist for this user, default to first school
+  if (!formattedSchools.find((s: any) => s.school.id === activeSchoolId)) {
+    activeSchoolId = formattedSchools[0].school.id
+  }
+  
   const activeSchoolDetails = formattedSchools.find((s: any) => s.school.id === activeSchoolId)?.school
 
   if (!activeSchoolDetails) {
@@ -97,14 +110,7 @@ export default async function LeerlingenPage(props: { searchParams: Promise<{ sc
         </form>
       </div>
 
-      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '1rem' }}>
-        <a href={`/leerlingen?school=${activeSchoolId}`} className="btn" style={{ backgroundColor: 'var(--primary)', color: 'white' }}>
-          Leerlingenmaaltijden
-        </a>
-        <a href={`/mijn-maaltijden?school=${activeSchoolId}`} className="btn" style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-main)' }}>
-          Mijn Maaltijden
-        </a>
-      </div>
+      <NavigationTabs activeSchoolId={activeSchoolId} currentTab="leerlingen" />
 
       <h1 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '1rem' }}>
         Klassen & Leerlingen
@@ -120,8 +126,11 @@ export default async function LeerlingenPage(props: { searchParams: Promise<{ sc
       />
 
       <div style={{ marginTop: '2rem' }}>
-        <StudentOrdersClient activeSchoolId={activeSchoolId} />
+        <SyncSchoolCookie activeSchoolId={activeSchoolId} />`n`n      <StudentOrdersClient activeSchoolId={activeSchoolId} />
       </div>
     </main>
   )
 }
+
+
+

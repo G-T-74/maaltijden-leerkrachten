@@ -25,6 +25,7 @@ export default function SchoolHeader({ userSchools, activeSchoolId, basePath }: 
 
   const handleSchoolChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newSchoolId = e.target.value
+    document.cookie = `activeSchoolId=${newSchoolId}; path=/; max-age=31536000; SameSite=Lax`
     const currentParams = new URLSearchParams(Array.from(searchParams.entries()))
     currentParams.set('school', newSchoolId)
     window.location.assign(`${basePath}?${currentParams.toString()}`)

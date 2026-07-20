@@ -1,8 +1,12 @@
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
+import { cookies } from 'next/headers'
 import OrderForm from '@/components/OrderForm'
 import OrderOverview from '@/components/OrderOverview'
 import SchoolHeader from '@/components/SchoolHeader'
+import SyncSchoolCookie from '@/components/SyncSchoolCookie'
+import NavigationTabs from '@/components/NavigationTabs'
 
 export default async function Home(props: { searchParams: Promise<{ school?: string }> }) {
   const searchParams = await props.searchParams
@@ -64,7 +68,16 @@ export default async function Home(props: { searchParams: Promise<{ school?: str
     school: us.schools
   }))
 
-  const activeSchoolId = searchParams?.school || formattedSchools[0].school.id
+  const cookieStore = await cookies()
+  const cookieSchoolId = cookieStore.get('activeSchoolId')?.value
+
+  let activeSchoolId = searchParams?.school || cookieSchoolId || formattedSchools[0].school.id
+  
+  // If the active school from cookie/url doesn't exist for this user, default to first school
+  if (!formattedSchools.find((s: any) => s.school.id === activeSchoolId)) {
+    activeSchoolId = formattedSchools[0].school.id
+  }
+  
   const activeSchoolDetails = formattedSchools.find((s: any) => s.school.id === activeSchoolId)?.school
 
   if (!activeSchoolDetails) {
@@ -142,14 +155,7 @@ export default async function Home(props: { searchParams: Promise<{ school?: str
         </form>
       </div>
 
-      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '1rem' }}>
-        <a href={`/leerlingen?school=${activeSchoolId}`} className="btn" style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-main)' }}>
-          Leerlingenmaaltijden
-        </a>
-        <a href={`/mijn-maaltijden?school=${activeSchoolId}`} className="btn" style={{ backgroundColor: 'var(--primary)', color: 'white' }}>
-          Mijn Maaltijden
-        </a>
-      </div>
+      <NavigationTabs activeSchoolId={activeSchoolId} currentTab="mijn-maaltijden" />
 
       <h1 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '1rem' }}>
         Mijn Maaltijden
@@ -164,10 +170,12 @@ export default async function Home(props: { searchParams: Promise<{ school?: str
         basePath="/mijn-maaltijden" 
       />
       
-      <OrderForm activeSchool={activeSchoolDetails} />
+      <SyncSchoolCookie activeSchoolId={activeSchoolId} />`n`n      <OrderForm activeSchool={activeSchoolDetails} />
       
       <OrderOverview orders={(orders as any) || []} availableMeals={availableMeals} />
 
     </main>
   )
 }
+
+

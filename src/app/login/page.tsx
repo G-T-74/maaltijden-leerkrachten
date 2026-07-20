@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { login, signup } from './actions'
 import styles from './login.module.css'
 
@@ -80,7 +81,14 @@ export default function LoginPage() {
           </div>
 
           <div className={styles.formGroup}>
-            <label htmlFor="password">Wachtwoord</label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label htmlFor="password">Wachtwoord</label>
+              {isLogin && (
+                <Link href="/wachtwoord-vergeten" style={{ fontSize: '0.85rem', color: 'var(--primary)', textDecoration: 'none' }}>
+                  Wachtwoord vergeten?
+                </Link>
+              )}
+            </div>
             <input 
               type="password" 
               id="password" 

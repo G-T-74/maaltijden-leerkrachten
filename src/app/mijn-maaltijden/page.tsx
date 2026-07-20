@@ -7,6 +7,7 @@ import OrderOverview from '@/components/OrderOverview'
 import SchoolHeader from '@/components/SchoolHeader'
 import SyncSchoolCookie from '@/components/SyncSchoolCookie'
 import NavigationTabs from '@/components/NavigationTabs'
+import FadeOutMessage from '@/components/FadeOutMessage'
 
 export default async function Home(props: { searchParams: Promise<{ school?: string }> }) {
   const searchParams = await props.searchParams
@@ -160,9 +161,11 @@ export default async function Home(props: { searchParams: Promise<{ school?: str
       <h1 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '1rem' }}>
         Mijn Maaltijden
       </h1>
-      <p style={{ color: 'var(--text-muted)' }}>
-        Welkom {capitalizedFirstName ? `${capitalizedFirstName}, je` : 'je'} bent succesvol ingelogd!
-      </p>
+      <FadeOutMessage>
+        <p style={{ color: 'var(--text-muted)' }}>
+          Welkom {capitalizedFirstName ? `${capitalizedFirstName}, je` : 'je'} bent succesvol ingelogd!
+        </p>
+      </FadeOutMessage>
 
       <SchoolHeader 
         userSchools={formattedSchools} 

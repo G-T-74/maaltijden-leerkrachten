@@ -6,6 +6,7 @@ import StudentOrdersClient from '@/components/student-meals/StudentOrdersClient'
 import SchoolHeader from '@/components/SchoolHeader'
 import SyncSchoolCookie from '@/components/SyncSchoolCookie'
 import NavigationTabs from '@/components/NavigationTabs'
+import FadeOutMessage from '@/components/FadeOutMessage'
 
 export default async function LeerlingenPage(props: { searchParams: Promise<{ school?: string }> }) {
   const searchParams = await props.searchParams
@@ -115,9 +116,11 @@ export default async function LeerlingenPage(props: { searchParams: Promise<{ sc
       <h1 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '1rem' }}>
         Klassen & Leerlingen
       </h1>
-      <p style={{ color: 'var(--text-muted)' }}>
-        Welkom {capitalizedFirstName ? `${capitalizedFirstName}, beheer` : 'beheer'} hier de bestellingen voor je klas(sen).
-      </p>
+      <FadeOutMessage>
+        <p style={{ color: 'var(--text-muted)' }}>
+          Welkom {capitalizedFirstName ? `${capitalizedFirstName}, beheer` : 'beheer'} hier de bestellingen voor je klas(sen).
+        </p>
+      </FadeOutMessage>
 
       <SchoolHeader 
         userSchools={formattedSchools} 

@@ -47,7 +47,7 @@ export default function StudentOrdersClient({ activeSchoolId }: { activeSchoolId
     loadMatrix()
   }, [activeClassId, date])
 
-  const loadMatrix = async () => {
+  async function loadMatrix() {
     setLoading(true)
     setMessage(null)
     

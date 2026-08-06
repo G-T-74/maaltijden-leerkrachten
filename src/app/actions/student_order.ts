@@ -181,11 +181,6 @@ export async function saveStudentOrdersBulk(classId: string, date: string, toIns
 export async function copyPreviousStudentOrders(classId: string, targetDate: string) {
   const supabase = await createClient()
   
-  const target = new Date(targetDate)
-  const previous = new Date(target)
-  previous.setDate(previous.getDate() - 7)
-  const previousDateStr = previous.toISOString().split('T')[0]
-
   // Haal studenten op van deze klas
   const { data: students } = await supabase
     .from('students')
@@ -196,7 +191,22 @@ export async function copyPreviousStudentOrders(classId: string, targetDate: str
   if (!students || students.length === 0) return { error: 'Geen leerlingen gevonden in deze klas' }
   const studentIds = students.map(s => s.id)
 
-  // Haal bestellingen op van vorige week
+  // Zoek de meest recente datum vòòr de targetDate waarop er bestellingen waren voor deze klas
+  const { data: lastOrderDateData } = await supabase
+    .from('student_orders')
+    .select('order_date')
+    .in('student_id', studentIds)
+    .lt('order_date', targetDate)
+    .order('order_date', { ascending: false })
+    .limit(1)
+
+  if (!lastOrderDateData || lastOrderDateData.length === 0) {
+    return { error: 'Geen eerdere bestellingen gevonden om over te nemen.' }
+  }
+
+  const previousDateStr = lastOrderDateData[0].order_date
+
+  // Haal bestellingen op van de laatst ingevulde dag
   const { data: oldOrders } = await supabase
     .from('student_orders')
     .select('student_id, student_meal_id, quantity, price_at_order')
@@ -229,7 +239,7 @@ export async function copyPreviousStudentOrders(classId: string, targetDate: str
     }))
 
   if (newOrders.length === 0) {
-    return { error: 'De bestelde maaltijden van vorige week zijn niet meer beschikbaar.' }
+    return { error: 'De bestelde maaltijden van de laatst ingevulde dag zijn niet meer beschikbaar.' }
   }
 
   // We moeten wel opletten: dit voegt enkel toe. Als er al bestellingen stonden op targetDate, kan dit conflicteren (UNIQUE).

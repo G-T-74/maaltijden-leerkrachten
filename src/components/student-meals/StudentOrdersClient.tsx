@@ -144,7 +144,7 @@ export default function StudentOrdersClient({ activeSchoolId }: { activeSchoolId
   }
 
   const handleCopyPrevious = async () => {
-    if (!confirm('Let op: hiermee worden je huidige niet-opgeslagen wijzigingen voor deze datum gewist, en wordt de bestelling van exacte één week geleden ingeladen. Doorgaan?')) return
+    if (!confirm('Let op: hiermee worden je huidige niet-opgeslagen wijzigingen voor deze datum gewist, en wordt de bestelling van de laatst ingevulde dag ingeladen. Doorgaan?')) return
     
     setLoading(true)
     const res = await copyPreviousStudentOrders(activeClassId, date)
@@ -152,7 +152,7 @@ export default function StudentOrdersClient({ activeSchoolId }: { activeSchoolId
       setMessage({ type: 'error', text: res.error })
       setLoading(false)
     } else {
-      setMessage({ type: 'success', text: `Succes: ${res.count} bestellingen overgenomen van vorige week.` })
+      setMessage({ type: 'success', text: `Succes: ${res.count} bestellingen overgenomen van de laatst ingevulde dag.` })
       loadMatrix()
     }
   }
@@ -226,7 +226,7 @@ export default function StudentOrdersClient({ activeSchoolId }: { activeSchoolId
               disabled={disabled || saving}
               className={`${styles.btn} ${styles.btnSecondary}`}
             >
-              📋 Vorige Week Overnemen
+              ⟲ Laatst Ingevulde Dag Overnemen
             </button>
             <button 
               onClick={handleSave} 

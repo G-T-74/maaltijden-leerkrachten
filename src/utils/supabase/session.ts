@@ -32,18 +32,22 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Define protected routes that require authentication
-  const isAuthRoute = request.nextUrl.pathname.startsWith('/login')
+  // Define public routes that do not require authentication
+  const isPublicRoute = 
+    request.nextUrl.pathname.startsWith('/login') ||
+    request.nextUrl.pathname.startsWith('/wachtwoord-vergeten') ||
+    request.nextUrl.pathname.startsWith('/wachtwoord-resetten') ||
+    request.nextUrl.pathname.startsWith('/auth/callback')
   
-  // Als een niet-ingelogde gebruiker een andere pagina dan /login bezoekt, stuur ze naar /login
-  if (!user && !isAuthRoute) {
+  // Als een niet-ingelogde gebruiker een andere pagina dan de publieke pagina's bezoekt, stuur ze naar /login
+  if (!user && !isPublicRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 
   // Als een ingelogde gebruiker de login pagina bezoekt, stuur ze door naar de home/dashboard pagina
-  if (user && isAuthRoute) {
+  if (user && request.nextUrl.pathname === '/login') {
     const url = request.nextUrl.clone()
     url.pathname = '/'
     return NextResponse.redirect(url)

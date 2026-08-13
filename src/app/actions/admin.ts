@@ -392,3 +392,70 @@ export async function resetSchoolYear(schoolId: string) {
   revalidatePath('/admin')
   return { success: true }
 }
+
+// --- CLASS GROUPS MANAGEMENT ---
+
+export async function getClassGroups(schoolId: string) {
+  const supabase = await createClient()
+  if (!(await checkAdmin(supabase))) return { error: 'Geen toegang' }
+
+  const { data, error } = await supabase
+    .from('class_groups')
+    .select('*')
+    .eq('school_id', schoolId)
+    .order('name')
+
+  if (error) return { error: error.message }
+  return { groups: data }
+}
+
+export async function createClassGroup(schoolId: string, name: string, orderCode: string) {
+  const supabase = await createClient()
+  if (!(await checkAdmin(supabase))) return { error: 'Geen toegang' }
+
+  const { error } = await supabase
+    .from('class_groups')
+    .insert([{ school_id: schoolId, name, order_code: orderCode }])
+
+  if (error) return { error: error.message }
+  return { success: true }
+}
+
+export async function updateClassGroup(groupId: string, name: string, orderCode: string) {
+  const supabase = await createClient()
+  if (!(await checkAdmin(supabase))) return { error: 'Geen toegang' }
+
+  const { error } = await supabase
+    .from('class_groups')
+    .update({ name, order_code: orderCode })
+    .eq('id', groupId)
+
+  if (error) return { error: error.message }
+  return { success: true }
+}
+
+export async function deleteClassGroup(groupId: string) {
+  const supabase = await createClient()
+  if (!(await checkAdmin(supabase))) return { error: 'Geen toegang' }
+
+  const { error } = await supabase
+    .from('class_groups')
+    .delete()
+    .eq('id', groupId)
+
+  if (error) return { error: error.message }
+  return { success: true }
+}
+
+export async function assignClassToGroup(classId: string, groupId: string | null) {
+  const supabase = await createClient()
+  if (!(await checkAdmin(supabase))) return { error: 'Geen toegang' }
+
+  const { error } = await supabase
+    .from('classes')
+    .update({ class_group_id: groupId })
+    .eq('id', classId)
+
+  if (error) return { error: error.message }
+  return { success: true }
+}

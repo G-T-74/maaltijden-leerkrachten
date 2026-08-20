@@ -234,7 +234,7 @@ export default function StudentOrdersClient({ activeSchoolId }: { activeSchoolId
               className={`${styles.btn} ${styles.btnPrimary}`}
               style={initialOrders.length > 0 ? { backgroundColor: '#2e7d32', borderColor: '#1b5e20', color: 'white' } : {}}
             >
-              {saving ? 'Opslaan...' : '💾 Bestelling Opslaan'}
+              {saving ? 'Opslaan...' : (initialOrders.length > 0 ? '💾 Bestelling Opgeslagen' : '💾 Bestelling Opslaan')}
             </button>
           </div>
         </div>

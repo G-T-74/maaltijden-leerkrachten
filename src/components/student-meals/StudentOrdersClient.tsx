@@ -232,6 +232,7 @@ export default function StudentOrdersClient({ activeSchoolId }: { activeSchoolId
               onClick={handleSave} 
               disabled={disabled || saving}
               className={`${styles.btn} ${styles.btnPrimary}`}
+              style={initialOrders.length > 0 ? { backgroundColor: '#2e7d32', borderColor: '#1b5e20', color: 'white' } : {}}
             >
               {saving ? 'Opslaan...' : '💾 Bestelling Opslaan'}
             </button>

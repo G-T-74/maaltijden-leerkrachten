@@ -13,7 +13,7 @@ type Meal = {
   price_lager?: number
   is_active: boolean
   caterer_id: string
-  caterers: { name: string }
+  caterers?: { name: string }
 }
 
 type Caterer = {
@@ -28,18 +28,21 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'teacher' | 'student'>('teacher')
   
-  // Form state
-  const [isEditing, setIsEditing] = useState(false)
-  const [editId, setEditId] = useState('')
-  const [name, setName] = useState('')
-  const [category, setCategory] = useState('')
-  const [price, setPrice] = useState<number | ''>('')
-  const [priceKleuter, setPriceKleuter] = useState<number | ''>('')
-  const [priceLager, setPriceLager] = useState<number | ''>('')
-  const [catererId, setCatererId] = useState('')
-  const [isActive, setIsActive] = useState(true)
+  // Top form state (Nieuwe Maaltijd)
+  const [newName, setNewName] = useState('')
+  const [newCategory, setNewCategory] = useState('')
+  const [newPrice, setNewPrice] = useState<number | ''>('')
+  const [newPriceKleuter, setNewPriceKleuter] = useState<number | ''>('')
+  const [newPriceLager, setNewPriceLager] = useState<number | ''>('')
+  const [newCatererId, setNewCatererId] = useState('')
+  const [newIsActive, setNewIsActive] = useState(true)
 
-  const [saving, setSaving] = useState(false)
+  const [savingNew, setSavingNew] = useState(false)
+
+  // Inline edit state
+  const [editId, setEditId] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState<Partial<Meal>>({})
+  const [savingEdit, setSavingEdit] = useState(false)
 
   const loadData = async () => {
     setLoading(true)
@@ -59,11 +62,10 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
       
     if (caterersRes.error && !error) setError(caterersRes.error)
     else if (caterersRes.caterers) {
-      // Filter the caterers to only include the active one so they don't add meals for another caterer via this screen
       const activeCaterer = caterersRes.caterers.find((c: Caterer) => c.id === activeCatererId)
       if (activeCaterer) {
         setCaterers([activeCaterer])
-        setCatererId(activeCaterer.id)
+        if (!newCatererId) setNewCatererId(activeCaterer.id)
       } else {
         setCaterers([])
       }
@@ -75,32 +77,24 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
     loadData()
   }, [activeCatererId, activeTab])
 
-  const resetForm = () => {
-    setIsEditing(false)
-    setEditId('')
-    setName('')
-    setCategory('')
-    setPrice('')
-    setPriceKleuter('')
-    setPriceLager('')
-    setIsActive(true)
-    if (caterers.length > 0) setCatererId(caterers[0].id)
+  const resetNewForm = () => {
+    setNewName('')
+    setNewCategory('')
+    setNewPrice('')
+    setNewPriceKleuter('')
+    setNewPriceLager('')
+    setNewIsActive(true)
+    if (caterers.length > 0) setNewCatererId(caterers[0].id)
   }
 
-  const handleEdit = (meal: Meal) => {
-    setIsEditing(true)
+  const cancelEdit = () => {
+    setEditId(null)
+    setEditForm({})
+  }
+
+  const startEdit = (meal: Meal) => {
     setEditId(meal.id)
-    setName(meal.name)
-    if (activeTab === 'teacher') {
-      setCategory(meal.category || '')
-      setPrice(meal.price || 0)
-    } else {
-      setPriceKleuter(meal.price_kleuter || 0)
-      setPriceLager(meal.price_lager || 0)
-    }
-    setCatererId(meal.caterer_id)
-    setIsActive(meal.is_active)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    setEditForm({ ...meal })
   }
 
   const handleDelete = async (id: string) => {
@@ -114,23 +108,22 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleCreateNew = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    setSaving(true)
+    setSavingNew(true)
     setError(null)
     
     const formData = new FormData()
-    if (isEditing) formData.append('id', editId)
-    formData.append('name', name)
-    formData.append('caterer_id', catererId)
-    formData.append('is_active', isActive.toString())
+    formData.append('name', newName)
+    formData.append('caterer_id', newCatererId)
+    formData.append('is_active', newIsActive.toString())
     
     if (activeTab === 'teacher') {
-      formData.append('category', category)
-      formData.append('price', price.toString())
+      formData.append('category', newCategory)
+      formData.append('price', newPrice.toString())
     } else {
-      formData.append('price_kleuter', priceKleuter.toString())
-      formData.append('price_lager', priceLager.toString())
+      formData.append('price_kleuter', newPriceKleuter.toString())
+      formData.append('price_lager', newPriceLager.toString())
     }
 
     const res = activeTab === 'teacher' ? await saveMeal(formData) : await saveStudentMeal(formData)
@@ -138,10 +131,42 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
     if (res.error) {
       setError(res.error)
     } else {
-      resetForm()
+      resetNewForm()
       loadData()
     }
-    setSaving(false)
+    setSavingNew(false)
+  }
+
+  const handleSaveEdit = async (e: React.FormEvent | React.MouseEvent) => {
+    e.preventDefault()
+    if (!editId) return
+
+    setSavingEdit(true)
+    setError(null)
+    
+    const formData = new FormData()
+    formData.append('id', editId)
+    formData.append('name', editForm.name || '')
+    formData.append('caterer_id', editForm.caterer_id || '')
+    formData.append('is_active', (editForm.is_active ?? true).toString())
+    
+    if (activeTab === 'teacher') {
+      formData.append('category', editForm.category || '')
+      formData.append('price', (editForm.price || 0).toString())
+    } else {
+      formData.append('price_kleuter', (editForm.price_kleuter || 0).toString())
+      formData.append('price_lager', (editForm.price_lager || 0).toString())
+    }
+
+    const res = activeTab === 'teacher' ? await saveMeal(formData) : await saveStudentMeal(formData)
+    
+    if (res.error) {
+      setError(res.error)
+    } else {
+      cancelEdit()
+      loadData()
+    }
+    setSavingEdit(false)
   }
 
   if (loading && meals.length === 0) return <div>Laden...</div>
@@ -155,13 +180,13 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
         
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           <button 
-            onClick={() => { setActiveTab('teacher'); resetForm(); }}
+            onClick={() => { setActiveTab('teacher'); resetNewForm(); cancelEdit(); }}
             className={`${styles.btn} ${activeTab === 'teacher' ? styles.btnPrimary : styles.btnSecondary}`}
           >
             Leerkrachten
           </button>
           <button 
-            onClick={() => { setActiveTab('student'); resetForm(); }}
+            onClick={() => { setActiveTab('student'); resetNewForm(); cancelEdit(); }}
             className={`${styles.btn} ${activeTab === 'student' ? styles.btnPrimary : styles.btnSecondary}`}
           >
             Leerlingen
@@ -169,20 +194,20 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
         </div>
       </div>
       
-      {error && <div style={{ color: 'var(--primary)', marginBottom: '1rem' }}>{error}</div>}
+      {error && <div style={{ color: 'var(--primary)', marginBottom: '1rem', backgroundColor: 'rgba(255,0,0,0.1)', padding: '1rem', borderRadius: '8px' }}>{error}</div>}
 
       <div className={`${styles.formCard} no-print`}>
         <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginBottom: '1rem' }}>
-          {isEditing ? 'Maaltijd Wijzigen' : 'Nieuwe Maaltijd Toevoegen'}
+          Nieuwe Maaltijd Toevoegen
         </h3>
-        <form onSubmit={handleSubmit} className={styles.formGrid}>
+        <form onSubmit={handleCreateNew} className={styles.formGrid}>
           <div className={styles.formGroup}>
             <label className={styles.label}>Naam</label>
             <input 
               type="text" 
               className={styles.input} 
-              value={name} 
-              onChange={e => setName(e.target.value)} 
+              value={newName} 
+              onChange={e => setNewName(e.target.value)} 
               required 
               placeholder={activeTab === 'teacher' ? "Bijv. Spaghetti Bolognese" : "Bijv. Warme Maaltijd"}
             />
@@ -194,8 +219,8 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
               <input 
                 type="text" 
                 className={styles.input} 
-                value={category} 
-                onChange={e => setCategory(e.target.value)} 
+                value={newCategory} 
+                onChange={e => setNewCategory(e.target.value)} 
                 required 
                 placeholder="Bijv. Warm, Koud, Soep"
               />
@@ -210,8 +235,8 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
                 step="0.01" 
                 min="0"
                 className={styles.input} 
-                value={price} 
-                onChange={e => setPrice(parseFloat(e.target.value))} 
+                value={newPrice} 
+                onChange={e => setNewPrice(parseFloat(e.target.value))} 
                 required 
               />
             </div>
@@ -224,8 +249,8 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
                   step="0.01" 
                   min="0"
                   className={styles.input} 
-                  value={priceKleuter} 
-                  onChange={e => setPriceKleuter(parseFloat(e.target.value))} 
+                  value={newPriceKleuter} 
+                  onChange={e => setNewPriceKleuter(parseFloat(e.target.value))} 
                   required 
                 />
               </div>
@@ -236,8 +261,8 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
                   step="0.01" 
                   min="0"
                   className={styles.input} 
-                  value={priceLager} 
-                  onChange={e => setPriceLager(parseFloat(e.target.value))} 
+                  value={newPriceLager} 
+                  onChange={e => setNewPriceLager(parseFloat(e.target.value))} 
                   required 
                 />
               </div>
@@ -248,8 +273,8 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
             <label className={styles.label}>Traiteur</label>
             <select 
               className={styles.select} 
-              value={catererId} 
-              onChange={e => setCatererId(e.target.value)}
+              value={newCatererId} 
+              onChange={e => setNewCatererId(e.target.value)}
               required
             >
               {caterers.map(c => (
@@ -261,20 +286,15 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
               <input 
                 type="checkbox" 
-                checked={isActive} 
-                onChange={e => setIsActive(e.target.checked)} 
+                checked={newIsActive} 
+                onChange={e => setNewIsActive(e.target.checked)} 
               />
               Actief (kan besteld worden)
             </label>
           </div>
           <div className={styles.formActions}>
-            {isEditing && (
-              <button type="button" onClick={resetForm} className={`${styles.btn} ${styles.btnSecondary}`}>
-                Annuleren
-              </button>
-            )}
-            <button type="submit" className={styles.btn} disabled={saving}>
-              {saving ? 'Opslaan...' : 'Opslaan'}
+            <button type="submit" className={styles.btn} disabled={savingNew}>
+              {savingNew ? 'Toevoegen...' : 'Toevoegen'}
             </button>
           </div>
         </form>
@@ -296,40 +316,139 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
               )}
               <th>Traiteur</th>
               <th>Status</th>
-              <th className="no-print">Acties</th>
+              <th className="no-print" style={{ minWidth: '150px' }}>Acties</th>
             </tr>
           </thead>
           <tbody>
-            {meals.map(meal => (
-              <tr key={meal.id} style={{ opacity: meal.is_active ? 1 : 0.6 }}>
-                <td>{meal.name}</td>
-                {activeTab === 'teacher' && <td>{meal.category}</td>}
-                {activeTab === 'teacher' ? (
-                  <td>€{meal.price?.toFixed(2)}</td>
-                ) : (
-                  <>
-                    <td>€{meal.price_kleuter?.toFixed(2)}</td>
-                    <td>€{meal.price_lager?.toFixed(2)}</td>
-                  </>
-                )}
-                <td>{meal.caterers?.name}</td>
-                <td>
-                  <span className={meal.is_active ? styles.statusActive : styles.statusInactive}>
-                    {meal.is_active ? 'Actief' : 'Inactief'}
-                  </span>
-                </td>
-                <td className="no-print">
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button onClick={() => handleEdit(meal)} className={`${styles.actionBtn} ${styles.editBtn}`}>
-                      Wijzig
-                    </button>
-                    <button onClick={() => handleDelete(meal.id)} className={`${styles.actionBtn} ${styles.deleteBtn}`}>
-                      Wis
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+            {meals.map(meal => {
+              const isEditing = editId === meal.id
+
+              return (
+                <tr key={meal.id} style={{ opacity: (!isEditing && !meal.is_active) ? 0.6 : 1, backgroundColor: isEditing ? 'var(--surface-hover)' : 'transparent' }}>
+                  {isEditing ? (
+                    // EDIT MODE
+                    <>
+                      <td>
+                        <input 
+                          type="text" 
+                          value={editForm.name || ''} 
+                          onChange={e => setEditForm({ ...editForm, name: e.target.value })}
+                          className={styles.input}
+                          style={{ minWidth: '150px' }}
+                        />
+                      </td>
+                      {activeTab === 'teacher' && (
+                        <td>
+                          <input 
+                            type="text" 
+                            value={editForm.category || ''} 
+                            onChange={e => setEditForm({ ...editForm, category: e.target.value })}
+                            className={styles.input}
+                            style={{ minWidth: '100px' }}
+                          />
+                        </td>
+                      )}
+                      {activeTab === 'teacher' ? (
+                        <td>
+                          <input 
+                            type="number" 
+                            step="0.01" 
+                            value={editForm.price ?? ''} 
+                            onChange={e => setEditForm({ ...editForm, price: parseFloat(e.target.value) })}
+                            className={styles.input}
+                            style={{ width: '80px' }}
+                          />
+                        </td>
+                      ) : (
+                        <>
+                          <td>
+                            <input 
+                              type="number" 
+                              step="0.01" 
+                              value={editForm.price_kleuter ?? ''} 
+                              onChange={e => setEditForm({ ...editForm, price_kleuter: parseFloat(e.target.value) })}
+                              className={styles.input}
+                              style={{ width: '80px' }}
+                            />
+                          </td>
+                          <td>
+                            <input 
+                              type="number" 
+                              step="0.01" 
+                              value={editForm.price_lager ?? ''} 
+                              onChange={e => setEditForm({ ...editForm, price_lager: parseFloat(e.target.value) })}
+                              className={styles.input}
+                              style={{ width: '80px' }}
+                            />
+                          </td>
+                        </>
+                      )}
+                      <td>
+                        <select 
+                          value={editForm.caterer_id || ''} 
+                          onChange={e => setEditForm({ ...editForm, caterer_id: e.target.value })}
+                          className={styles.select}
+                        >
+                          {caterers.map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
+                      </td>
+                      <td>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                          <input 
+                            type="checkbox" 
+                            checked={editForm.is_active ?? true} 
+                            onChange={e => setEditForm({ ...editForm, is_active: e.target.checked })} 
+                          />
+                          Actief
+                        </label>
+                      </td>
+                      <td className="no-print">
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button onClick={handleSaveEdit} disabled={savingEdit} className={`${styles.actionBtn} ${styles.editBtn}`} style={{ backgroundColor: 'var(--success)' }}>
+                            {savingEdit ? '...' : 'Opslaan'}
+                          </button>
+                          <button onClick={cancelEdit} disabled={savingEdit} className={`${styles.actionBtn} ${styles.deleteBtn}`} style={{ backgroundColor: 'var(--text-muted)' }}>
+                            Annuleer
+                          </button>
+                        </div>
+                      </td>
+                    </>
+                  ) : (
+                    // VIEW MODE
+                    <>
+                      <td>{meal.name}</td>
+                      {activeTab === 'teacher' && <td>{meal.category}</td>}
+                      {activeTab === 'teacher' ? (
+                        <td>€{meal.price?.toFixed(2)}</td>
+                      ) : (
+                        <>
+                          <td>€{meal.price_kleuter?.toFixed(2)}</td>
+                          <td>€{meal.price_lager?.toFixed(2)}</td>
+                        </>
+                      )}
+                      <td>{meal.caterers?.name}</td>
+                      <td>
+                        <span className={meal.is_active ? styles.statusActive : styles.statusInactive}>
+                          {meal.is_active ? 'Actief' : 'Inactief'}
+                        </span>
+                      </td>
+                      <td className="no-print">
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button onClick={() => startEdit(meal)} className={`${styles.actionBtn} ${styles.editBtn}`}>
+                            Wijzig
+                          </button>
+                          <button onClick={() => handleDelete(meal.id)} className={`${styles.actionBtn} ${styles.deleteBtn}`}>
+                            Wis
+                          </button>
+                        </div>
+                      </td>
+                    </>
+                  )}
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>

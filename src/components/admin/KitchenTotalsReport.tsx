@@ -26,6 +26,7 @@ export default function KitchenTotalsReport({ schoolId }: { schoolId: string }) 
   const [loading, setLoading] = useState(true)
   const [applyFactor, setApplyFactor] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [classStatuses, setClassStatuses] = useState<{ id: string, name: string, ordered: boolean }[]>([])
 
   const supabase = createClient()
 
@@ -73,7 +74,7 @@ export default function KitchenTotalsReport({ schoolId }: { schoolId: string }) 
       // 4. Haal klassen en studenten op voor deze school
       const { data: classes, error: classErr } = await supabase
         .from('classes')
-        .select('id, level, class_group_id')
+        .select('id, name, level, class_group_id')
         .eq('school_id', schoolId)
       
       if (classErr) {
@@ -84,11 +85,11 @@ export default function KitchenTotalsReport({ schoolId }: { schoolId: string }) 
       const classIds = classes?.map(c => c.id) || []
       
       let studentOrdersData: any[] = []
-      let studentsMap: Record<string, { level: string, class_group_id: string | null }> = {} // student_id -> { level, class_group_id }
+      let studentsMap: Record<string, { class_id: string, level: string, class_group_id: string | null }> = {} // student_id -> { class_id, level, class_group_id }
       
       if (classIds.length > 0) {
-        const classInfoMap: Record<string, { level: string, class_group_id: string | null }> = {}
-        classes?.forEach(c => classInfoMap[c.id] = { level: c.level, class_group_id: c.class_group_id })
+        const classInfoMap: Record<string, { class_id: string, level: string, class_group_id: string | null }> = {}
+        classes?.forEach(c => classInfoMap[c.id] = { class_id: c.id, level: c.level, class_group_id: c.class_group_id })
 
         const { data: students, error: studErr } = await supabase
           .from('students')
@@ -127,6 +128,7 @@ export default function KitchenTotalsReport({ schoolId }: { schoolId: string }) 
       // 5. Groeperen per Groep -> Maaltijdnaam en Categorie
       // Structuur: Record<groupId, Record<mealKey, MealTotal>>
       const groupedData: Record<string, Record<string, MealTotal>> = {}
+      const orderedClassIds = new Set<string>()
 
       // Initialiseer groepen (zodat lege groepen ook kunnen bestaan als er geen bestellingen zijn? 
       // Beter om enkel groepen te tonen met bestellingen, of alle groepen)
@@ -159,6 +161,11 @@ export default function KitchenTotalsReport({ schoolId }: { schoolId: string }) 
 
         let category = 'Leerling Maaltijden'
         const studentInfo = studentsMap[order.student_id]
+        
+        if (studentInfo) {
+          orderedClassIds.add(studentInfo.class_id)
+        }
+        
         const groupId = studentInfo?.class_group_id || 'ungrouped'
 
         const key = `${category}_${name}`
@@ -219,6 +226,16 @@ export default function KitchenTotalsReport({ schoolId }: { schoolId: string }) 
       }
 
       setGroupedTotals(finalGroups)
+      
+      // Update class statuses
+      const statuses = classes?.map(c => ({
+        id: c.id,
+        name: c.name,
+        ordered: orderedClassIds.has(c.id)
+      })).sort((a, b) => a.name.localeCompare(b.name)) || []
+      
+      setClassStatuses(statuses)
+      
       setLoading(false)
     }
 
@@ -275,6 +292,25 @@ export default function KitchenTotalsReport({ schoolId }: { schoolId: string }) 
       {errorMsg && (
         <div style={{ backgroundColor: 'rgba(255,0,0,0.1)', color: 'red', padding: '1rem', marginBottom: '1rem', borderRadius: '8px' }}>
           <strong>Error loading data:</strong> {errorMsg}
+        </div>
+      )}
+
+      {!loading && classStatuses.length > 0 && (
+        <div className="no-print" style={{ marginBottom: '2rem', display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginRight: '0.5rem' }}>Klassen status:</span>
+          {classStatuses.map(c => (
+            <span key={c.id} style={{
+              padding: '0.25rem 0.5rem',
+              borderRadius: '4px',
+              fontSize: '0.85rem',
+              fontWeight: 'bold',
+              backgroundColor: c.ordered ? '#e8f5e9' : '#ffebee',
+              color: c.ordered ? '#2e7d32' : '#c62828',
+              border: `1px solid ${c.ordered ? '#a5d6a7' : '#ef9a9a'}`
+            }}>
+              {c.name}
+            </span>
+          ))}
         </div>
       )}
 

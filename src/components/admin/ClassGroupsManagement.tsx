@@ -124,14 +124,24 @@ export default function ClassGroupsManagement({ schoolId }: { schoolId: string }
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {groups.map(group => (
-                <div key={group.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--surface)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                <div key={group.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', backgroundColor: 'var(--surface)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
                   <div>
                     <div style={{ fontWeight: 600 }}>{group.name}</div>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Code: {group.order_code}</div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '0.5rem' }}>Code: {group.order_code}</div>
+                    
+                    {/* Toon gekoppelde klassen */}
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-main)' }}>
+                      <strong>Gekoppelde klassen: </strong>
+                      {(() => {
+                        const linkedClasses = classes.filter(c => c.class_group_id === group.id);
+                        if (linkedClasses.length === 0) return <span style={{ color: 'var(--text-muted)' }}>Geen</span>;
+                        return linkedClasses.map(c => c.name).join(', ');
+                      })()}
+                    </div>
                   </div>
                   <button 
                     onClick={() => handleDeleteGroup(group.id)}
-                    style={{ backgroundColor: 'transparent', border: 'none', color: '#c62828', cursor: 'pointer' }}
+                    style={{ backgroundColor: 'transparent', border: 'none', color: '#c62828', cursor: 'pointer', padding: '0.25rem' }}
                   >
                     Verwijder
                   </button>

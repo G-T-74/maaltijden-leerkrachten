@@ -56,7 +56,7 @@ export async function getClassesAndStudents(schoolId: string) {
   const { data: classesData, error: classesError } = await supabase
     .from('classes')
     .select(`
-      id, name, level, group_id,
+      id, name, level, group_id, class_group_id,
       students ( id, class_number, first_name, is_hidden )
     `)
     .eq('school_id', schoolId)

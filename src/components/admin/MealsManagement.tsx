@@ -31,9 +31,9 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
   // Top form state (Nieuwe Maaltijd)
   const [newName, setNewName] = useState('')
   const [newCategory, setNewCategory] = useState('')
-  const [newPrice, setNewPrice] = useState<number | ''>('')
-  const [newPriceKleuter, setNewPriceKleuter] = useState<number | ''>('')
-  const [newPriceLager, setNewPriceLager] = useState<number | ''>('')
+  const [newPrice, setNewPrice] = useState<string | number>('')
+  const [newPriceKleuter, setNewPriceKleuter] = useState<string | number>('')
+  const [newPriceLager, setNewPriceLager] = useState<string | number>('')
   const [newCatererId, setNewCatererId] = useState('')
   const [newIsActive, setNewIsActive] = useState(true)
 
@@ -120,10 +120,10 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
     
     if (activeTab === 'teacher') {
       formData.append('category', newCategory)
-      formData.append('price', newPrice.toString())
+      formData.append('price', String(newPrice).replace(',', '.'))
     } else {
-      formData.append('price_kleuter', newPriceKleuter.toString())
-      formData.append('price_lager', newPriceLager.toString())
+      formData.append('price_kleuter', String(newPriceKleuter).replace(',', '.'))
+      formData.append('price_lager', String(newPriceLager).replace(',', '.'))
     }
 
     const res = activeTab === 'teacher' ? await saveMeal(formData) : await saveStudentMeal(formData)
@@ -152,10 +152,10 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
     
     if (activeTab === 'teacher') {
       formData.append('category', editForm.category || '')
-      formData.append('price', (editForm.price || 0).toString())
+      formData.append('price', String(editForm.price || 0).replace(',', '.'))
     } else {
-      formData.append('price_kleuter', (editForm.price_kleuter || 0).toString())
-      formData.append('price_lager', (editForm.price_lager || 0).toString())
+      formData.append('price_kleuter', String(editForm.price_kleuter || 0).replace(',', '.'))
+      formData.append('price_lager', String(editForm.price_lager || 0).replace(',', '.'))
     }
 
     const res = activeTab === 'teacher' ? await saveMeal(formData) : await saveStudentMeal(formData)
@@ -232,11 +232,11 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
               <label className={styles.label}>Prijs (€)</label>
               <input 
                 type="number" 
-                step="0.01" 
+                step="0.1" 
                 min="0"
                 className={styles.input} 
                 value={newPrice} 
-                onChange={e => setNewPrice(parseFloat(e.target.value))} 
+                onChange={e => setNewPrice(e.target.value)} 
                 required 
               />
             </div>
@@ -246,11 +246,11 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
                 <label className={styles.label}>Prijs Kleuter (€)</label>
                 <input 
                   type="number" 
-                  step="0.01" 
+                  step="0.1" 
                   min="0"
                   className={styles.input} 
                   value={newPriceKleuter} 
-                  onChange={e => setNewPriceKleuter(parseFloat(e.target.value))} 
+                  onChange={e => setNewPriceKleuter(e.target.value)} 
                   required 
                 />
               </div>
@@ -258,11 +258,11 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
                 <label className={styles.label}>Prijs Lager (€)</label>
                 <input 
                   type="number" 
-                  step="0.01" 
+                  step="0.1" 
                   min="0"
                   className={styles.input} 
                   value={newPriceLager} 
-                  onChange={e => setNewPriceLager(parseFloat(e.target.value))} 
+                  onChange={e => setNewPriceLager(e.target.value)} 
                   required 
                 />
               </div>
@@ -352,9 +352,9 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
                         <td>
                           <input 
                             type="number" 
-                            step="0.01" 
+                            step="0.1" 
                             value={editForm.price ?? ''} 
-                            onChange={e => setEditForm({ ...editForm, price: parseFloat(e.target.value) })}
+                            onChange={e => setEditForm({ ...editForm, price: e.target.value })}
                             className={styles.input}
                             style={{ width: '80px' }}
                           />
@@ -364,9 +364,9 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
                           <td>
                             <input 
                               type="number" 
-                              step="0.01" 
+                              step="0.1" 
                               value={editForm.price_kleuter ?? ''} 
-                              onChange={e => setEditForm({ ...editForm, price_kleuter: parseFloat(e.target.value) })}
+                              onChange={e => setEditForm({ ...editForm, price_kleuter: e.target.value })}
                               className={styles.input}
                               style={{ width: '80px' }}
                             />
@@ -374,9 +374,9 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
                           <td>
                             <input 
                               type="number" 
-                              step="0.01" 
+                              step="0.1" 
                               value={editForm.price_lager ?? ''} 
-                              onChange={e => setEditForm({ ...editForm, price_lager: parseFloat(e.target.value) })}
+                              onChange={e => setEditForm({ ...editForm, price_lager: e.target.value })}
                               className={styles.input}
                               style={{ width: '80px' }}
                             />

@@ -1,6 +1,7 @@
 'use client'
 
 import React from 'react'
+import Link from 'next/link'
 
 export default function NavigationTabs({ activeSchoolId, currentTab }: { activeSchoolId: string, currentTab: 'leerlingen' | 'mijn-maaltijden' }) {
   const navigate = (path: string) => {
@@ -10,30 +11,32 @@ export default function NavigationTabs({ activeSchoolId, currentTab }: { activeS
 
   return (
     <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '1rem' }}>
-      <button 
-        onClick={() => navigate('/leerlingen')} 
+      <Link 
+        href={`/leerlingen?school=${activeSchoolId}`}
         className="btn" 
         style={{ 
           backgroundColor: currentTab === 'leerlingen' ? 'var(--primary)' : 'transparent', 
           color: currentTab === 'leerlingen' ? 'white' : 'var(--text-main)',
           border: currentTab === 'leerlingen' ? 'none' : '1px solid var(--border)',
-          cursor: 'pointer'
+          cursor: 'pointer',
+          textDecoration: 'none'
         }}
       >
         Leerlingenmaaltijden
-      </button>
-      <button 
-        onClick={() => navigate('/mijn-maaltijden')} 
+      </Link>
+      <Link 
+        href={`/mijn-maaltijden?school=${activeSchoolId}`}
         className="btn" 
         style={{ 
           backgroundColor: currentTab === 'mijn-maaltijden' ? 'var(--primary)' : 'transparent', 
           color: currentTab === 'mijn-maaltijden' ? 'white' : 'var(--text-main)',
           border: currentTab === 'mijn-maaltijden' ? 'none' : '1px solid var(--border)',
-          cursor: 'pointer'
+          cursor: 'pointer',
+          textDecoration: 'none'
         }}
       >
         Mijn Maaltijden
-      </button>
+      </Link>
     </div>
   )
 }

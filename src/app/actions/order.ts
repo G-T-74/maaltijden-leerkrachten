@@ -42,6 +42,7 @@ export async function placeOrder(formData: FormData) {
   const mealId = formData.get('meal_id') as string
   const quantity = parseInt(formData.get('quantity') as string, 10)
   const orderDate = formData.get('order_date') as string
+  const note = formData.get('note') as string || null
 
   if (!schoolId || !mealId || !quantity || !orderDate) {
     return { error: 'Vul alle verplichte velden in.' }
@@ -100,7 +101,8 @@ export async function placeOrder(formData: FormData) {
       meal_id: mealId,
       quantity,
       order_date: orderDate,
-      price_at_order: meal.price
+      price_at_order: meal.price,
+      note
     })
 
   if (insertError) {
@@ -221,12 +223,15 @@ export async function updateOrder(formData: FormData) {
     return { error: 'Gekozen maaltijd bestaat niet.' }
   }
 
+  const note = formData.get('note') as string || null
+
   const { error: updateError } = await supabase
     .from('orders')
     .update({
       meal_id: mealId,
       quantity,
-      price_at_order: meal.price
+      price_at_order: meal.price,
+      note
     })
     .eq('id', orderId)
 

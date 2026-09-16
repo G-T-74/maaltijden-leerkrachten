@@ -9,6 +9,7 @@ type Order = {
   order_date: string
   quantity: number
   price_at_order: number
+  note?: string | null
   schools: { name: string }
   meals: { id: string, name: string, category: string, caterer_id: string }
 }
@@ -34,6 +35,7 @@ export default function OrderOverview({ orders, availableMeals }: OrderOverviewP
   // Local state for the edit form
   const [editMealId, setEditMealId] = useState<string>('')
   const [editQuantity, setEditQuantity] = useState<number>(1)
+  const [editNote, setEditNote] = useState<string>('')
 
   const isEditable = (orderDate: string) => {
     const now = new Date()
@@ -75,6 +77,7 @@ export default function OrderOverview({ orders, availableMeals }: OrderOverviewP
     setEditingOrderId(order.id)
     setEditMealId(order.meals.id)
     setEditQuantity(order.quantity)
+    setEditNote(order.note || '')
     setError(null)
   }
 
@@ -162,6 +165,11 @@ export default function OrderOverview({ orders, availableMeals }: OrderOverviewP
                     <div className={styles.mealInfo}>
                       <span className={styles.mealCategory}>{order.meals.category}</span>
                       <span className={styles.mealName}>{order.quantity}x {order.meals.name}</span>
+                      {order.note && (
+                        <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.25rem', fontStyle: 'italic' }}>
+                          Opmerking: {order.note}
+                        </span>
+                      )}
                     </div>
                     <div className={styles.orderPrice}>
                       €{(order.price_at_order * order.quantity).toFixed(2)}
@@ -196,16 +204,30 @@ export default function OrderOverview({ orders, availableMeals }: OrderOverviewP
                       ))}
                     </select>
                   </div>
-                  <div className={styles.formGroup}>
-                    <label className={styles.label}>Aantal</label>
-                    <input 
-                      type="number" 
-                      name="quantity" 
-                      min="1" 
-                      className={styles.input} 
-                      value={editQuantity} 
-                      onChange={e => setEditQuantity(parseInt(e.target.value))}
-                    />
+                  <div style={{ display: 'flex', gap: '1rem' }}>
+                    <div className={styles.formGroup} style={{ flex: 1 }}>
+                      <label className={styles.label}>Aantal</label>
+                      <input 
+                        type="number" 
+                        name="quantity" 
+                        min="1" 
+                        className={styles.input} 
+                        value={editQuantity} 
+                        onChange={e => setEditQuantity(parseInt(e.target.value))}
+                      />
+                    </div>
+                    <div className={styles.formGroup} style={{ flex: 2 }}>
+                      <label className={styles.label}>Opmerking</label>
+                      <input 
+                        type="text" 
+                        name="note" 
+                        className={styles.input} 
+                        value={editNote} 
+                        onChange={e => setEditNote(e.target.value)}
+                        placeholder="Optioneel..."
+                        maxLength={255}
+                      />
+                    </div>
                   </div>
                   <div className={styles.editActions}>
                     <button type="button" onClick={() => setEditingOrderId(null)} className={`${styles.btn} ${styles.btnCancel}`}>

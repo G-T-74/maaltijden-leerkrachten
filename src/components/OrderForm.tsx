@@ -196,17 +196,30 @@ export default function OrderForm({ activeSchool }: OrderFormProps) {
           </div>
         </div>
 
-        <div className={styles.formGroup}>
-          <label className={styles.label}>Aantal</label>
-          <input 
-            type="number" 
-            name="quantity" 
-            className={styles.input}
-            min="1"
-            value={quantity}
-            onChange={(e) => setQuantity(parseInt(e.target.value))}
-            required
-          />
+        <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
+          <div className={styles.formGroup} style={{ flex: 1 }}>
+            <label className={styles.label}>Aantal</label>
+            <input 
+              type="number" 
+              name="quantity" 
+              className={styles.input}
+              min="1"
+              value={quantity}
+              onChange={(e) => setQuantity(parseInt(e.target.value))}
+              required
+            />
+          </div>
+
+          <div className={styles.formGroup} style={{ flex: 2 }}>
+            <label className={styles.label}>Opmerking (optioneel)</label>
+            <input 
+              type="text" 
+              name="note" 
+              className={styles.input}
+              placeholder="Bijv. glutenvrij, saus apart..."
+              maxLength={255}
+            />
+          </div>
         </div>
 
         <button 

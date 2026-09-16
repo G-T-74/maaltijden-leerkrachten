@@ -97,6 +97,7 @@ export default async function Home(props: { searchParams: Promise<{ school?: str
       order_date,
       quantity,
       price_at_order,
+      note,
       schools ( name ),
       meals ( id, name, category, caterer_id )
     `)

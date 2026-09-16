@@ -27,6 +27,7 @@ export default function DailyOrdersReport({ schoolId, catererId }: { schoolId: s
         quantity,
         price_at_order,
         meal_id,
+        note,
         profiles ( first_name, last_name ),
         meals ( name, category )
       `)
@@ -126,6 +127,7 @@ export default function DailyOrdersReport({ schoolId, catererId }: { schoolId: s
                 <th style={{ padding: '1rem', color: 'var(--text-muted)', fontWeight: 500 }}>Leerkracht</th>
                 <th style={{ padding: '1rem', color: 'var(--text-muted)', fontWeight: 500 }}>Maaltijd</th>
                 <th style={{ padding: '1rem', color: 'var(--text-muted)', fontWeight: 500 }}>Aantal</th>
+                <th style={{ padding: '1rem', color: 'var(--text-muted)', fontWeight: 500 }}>Opmerking</th>
                 <th style={{ padding: '1rem', color: 'var(--text-muted)', fontWeight: 500 }}>Prijs p.s.</th>
                 <th style={{ padding: '1rem', color: 'var(--text-muted)', fontWeight: 500 }}>Totaal</th>
                 <th className="no-print" style={{ padding: '1rem', color: 'var(--text-muted)', fontWeight: 500 }}>Acties</th>
@@ -165,6 +167,7 @@ export default function DailyOrdersReport({ schoolId, catererId }: { schoolId: s
                         </td>
                         <td style={{ padding: '1rem', color: 'var(--text-muted)' }}>-</td>
                         <td style={{ padding: '1rem', color: 'var(--text-muted)' }}>-</td>
+                        <td style={{ padding: '1rem', color: 'var(--text-muted)' }}>-</td>
                         <td className="no-print" style={{ padding: '1rem' }}>
                           <div style={{ display: 'flex', gap: '0.5rem' }}>
                             <button 
@@ -190,6 +193,7 @@ export default function DailyOrdersReport({ schoolId, catererId }: { schoolId: s
                           {order.meals?.name} <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>({order.meals?.category})</span>
                         </td>
                         <td style={{ padding: '1rem' }}>{order.quantity}</td>
+                        <td style={{ padding: '1rem', fontStyle: 'italic', color: 'var(--text-muted)' }}>{order.note || '-'}</td>
                         <td style={{ padding: '1rem' }}>€{Number(order.price_at_order).toFixed(2)}</td>
                         <td style={{ padding: '1rem', fontWeight: 'bold' }}>€{total}</td>
                         <td className="no-print" style={{ padding: '1rem' }}>

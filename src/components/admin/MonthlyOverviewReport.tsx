@@ -34,6 +34,7 @@ export default function MonthlyOverviewReport({ schoolId }: { schoolId: string }
           order_date,
           quantity,
           price_at_order,
+          note,
           profiles ( first_name, last_name ),
           meals ( name )
         `)
@@ -268,6 +269,7 @@ export default function MonthlyOverviewReport({ schoolId }: { schoolId: string }
                     <th style={{ padding: '0.5rem', color: 'var(--text-muted)' }}>Datum</th>
                     <th style={{ padding: '0.5rem', color: 'var(--text-muted)' }}>Maaltijd</th>
                     <th style={{ padding: '0.5rem', color: 'var(--text-muted)' }}>Aantal</th>
+                    <th style={{ padding: '0.5rem', color: 'var(--text-muted)' }}>Opmerking</th>
                     <th style={{ padding: '0.5rem', color: 'var(--text-muted)' }}>Prijs</th>
                   </tr>
                 </thead>
@@ -282,6 +284,9 @@ export default function MonthlyOverviewReport({ schoolId }: { schoolId: string }
                       </td>
                       <td style={{ padding: '0.5rem', borderBottom: '1px solid var(--border)' }}>
                         {order.quantity}
+                      </td>
+                      <td style={{ padding: '0.5rem', borderBottom: '1px solid var(--border)', fontStyle: 'italic', color: 'var(--text-muted)' }}>
+                        {order.note || '-'}
                       </td>
                       <td style={{ padding: '0.5rem', borderBottom: '1px solid var(--border)' }}>
                         €{(order.quantity * order.price_at_order).toFixed(2)}

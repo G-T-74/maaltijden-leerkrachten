@@ -280,6 +280,7 @@ export async function exportYearlyData(schoolId: string) {
       order_date,
       quantity,
       price_at_order,
+      note,
       profiles ( first_name, last_name ),
       meals ( name )
     `)
@@ -331,7 +332,7 @@ export async function exportYearlyData(schoolId: string) {
   }
 
   // Bouw CSV
-  let csv = 'Datum;Besteller;Klas;Maaltijd;Type;Aantal;Totaalprijs\n'
+  let csv = 'Datum;Besteller;Klas;Maaltijd;Type;Aantal;Totaalprijs;Opmerking\n'
 
   teacherOrders?.forEach(o => {
     const prof = o.profiles as any
@@ -339,14 +340,15 @@ export async function exportYearlyData(schoolId: string) {
     const naam = `${prof?.first_name || ''} ${prof?.last_name || ''}`.trim() || 'Onbekend'
     const maaltijd = meal?.name || 'Onbekend'
     const prijs = (o.quantity * o.price_at_order).toFixed(2)
-    csv += `${o.order_date};${naam};-;${maaltijd};Leerkracht;${o.quantity};${prijs}\n`
+    const opmerking = o.note ? `"${o.note.replace(/"/g, '""')}"` : '-'
+    csv += `${o.order_date};${naam};-;${maaltijd};Leerkracht;${o.quantity};${prijs};${opmerking}\n`
   })
 
   studentOrders.forEach(o => {
     const smeal = o.student_meals as any
     const maaltijd = smeal?.name || 'Onbekend'
     const prijs = (o.quantity * o.price_at_order).toFixed(2)
-    csv += `${o.order_date};${o.student_name};${o.class_name};${maaltijd};Leerling;${o.quantity};${prijs}\n`
+    csv += `${o.order_date};${o.student_name};${o.class_name};${maaltijd};Leerling;${o.quantity};${prijs};-\n`
   })
 
   return { csv }

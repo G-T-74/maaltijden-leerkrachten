@@ -461,3 +461,43 @@ export async function assignClassToGroup(classId: string, groupId: string | null
   if (error) return { error: error.message }
   return { success: true }
 }
+
+export async function getSchoolTeachers(schoolId: string) {
+  const supabase = await createClient()
+  if (!(await checkAdmin(supabase))) return { error: 'Geen toegang' }
+
+  const { data, error } = await supabase
+    .from('user_schools')
+    .select(`
+      user_id,
+      profiles ( first_name, last_name )
+    `)
+    .eq('school_id', schoolId)
+
+  if (error) return { error: error.message }
+  
+  const teachers = data.map(us => {
+    const p = us.profiles as any
+    return {
+      id: us.user_id,
+      name: `${p?.first_name || ''} ${p?.last_name || ''}`.trim() || 'Onbekend'
+    }
+  }).sort((a, b) => a.name.localeCompare(b.name))
+
+  return { teachers }
+}
+
+export async function unlinkTeacherFromSchool(userId: string, schoolId: string) {
+  const supabase = await createClient()
+  if (!(await checkAdmin(supabase))) return { error: 'Geen toegang' }
+
+  const { error } = await supabase
+    .from('user_schools')
+    .delete()
+    .eq('user_id', userId)
+    .eq('school_id', schoolId)
+
+  if (error) return { error: error.message }
+  
+  return { success: true }
+}

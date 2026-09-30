@@ -257,7 +257,7 @@ export default function StudentsManagement({ schoolId }: { schoolId: string }) {
           Bepaald welke klassen zichtbaar zijn in het bestelscherm van elke leerkracht.
         </p>
 
-        {loadingTeachers ? <p>Laden...</p> : teachers.length === 0 ? (
+        {loading ? <p>Laden...</p> : teachers.length === 0 ? (
           <p className={styles.description}>Geen leerkrachten gevonden voor deze school. Koppel eerst leerkrachten via het profiel of de database.</p>
         ) : (
           <div className={styles.tableWrapper}>

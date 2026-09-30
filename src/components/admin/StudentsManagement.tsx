@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Papa from 'papaparse'
-import { importStudentsCsv, getClassesAndStudents, toggleStudentVisibility, addStudentManually, getTeachersAndClasses, toggleTeacherClass, getAllProfiles, toggleUserSchool } from '@/app/actions/student_admin'
+import { importStudentsCsv, getClassesAndStudents, toggleStudentVisibility, addStudentManually, getTeachersAndClasses, toggleTeacherClass } from '@/app/actions/student_admin'
 import styles from './StudentsManagement.module.css'
 
 type CsvRow = {
@@ -37,24 +37,15 @@ export default function StudentsManagement({ schoolId }: { schoolId: string }) {
   // Teachers State
   const [teachers, setTeachers] = useState<any[]>([])
   const [links, setLinks] = useState<any[]>([])
-  const [loadingTeachers, setLoadingTeachers] = useState(false)
-
-  // All Profiles State
-  const [allProfiles, setAllProfiles] = useState<any[]>([])
-  const [schoolLinks, setSchoolLinks] = useState<any[]>([])
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false)
-
   useEffect(() => {
     loadData()
   }, [schoolId])
 
   const loadData = async () => {
     setLoading(true)
-    setLoadingTeachers(true)
-    const [res, tRes, pRes] = await Promise.all([
+    const [res, tRes] = await Promise.all([
       getClassesAndStudents(schoolId),
-      getTeachersAndClasses(schoolId),
-      getAllProfiles(schoolId)
+      getTeachersAndClasses(schoolId)
     ])
     
     if (res.classes) setClasses(res.classes)
@@ -62,16 +53,9 @@ export default function StudentsManagement({ schoolId }: { schoolId: string }) {
     if (tRes.teachers) {
       setTeachers(tRes.teachers)
       setLinks(tRes.links || [])
-      setIsSuperAdmin(!!tRes.isSuperAdmin)
-    }
-    
-    if (pRes && pRes.profiles) {
-      setAllProfiles(pRes.profiles)
-      setSchoolLinks(pRes.linkedUserIds || [])
     }
     
     setLoading(false)
-    setLoadingTeachers(false)
   }
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -315,51 +299,6 @@ export default function StudentsManagement({ schoolId }: { schoolId: string }) {
         )}
       </div>
 
-      {/* LEERKRACHTEN AAN SCHOOL KOPPELEN (ENKEL SUPERADMIN) */}
-      {isSuperAdmin && (
-        <div className={styles.card}>
-          <h3 className={styles.cardTitle}>Leerkrachten Toevoegen aan School <span style={{fontSize: '0.8rem', backgroundColor: 'var(--primary)', color: 'white', padding: '2px 6px', borderRadius: '4px', marginLeft: '8px'}}>Superadmin</span></h3>
-          <p className={styles.description}>
-            Selecteer welke geregistreerde gebruikers bij deze school horen. Pas als een leerkracht hier is aangevinkt, kun je hem/haar hierboven aan klassen koppelen.
-          </p>
-
-          {loadingTeachers ? <p>Laden...</p> : (
-            <div className={styles.tableWrapper}>
-              <table className={styles.table}>
-                <thead>
-                  <tr>
-                    <th>Gebruiker</th>
-                    <th>Rol</th>
-                    <th>Gekoppeld aan deze school?</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {allProfiles.map(profile => {
-                    const isLinked = schoolLinks.includes(profile.id)
-                    return (
-                      <tr key={profile.id} style={{ opacity: isLinked ? 1 : 0.6 }}>
-                        <td style={{ fontWeight: 500 }}>{profile.first_name} {profile.last_name}</td>
-                        <td>{profile.role === 'superadmin' ? 'Superbeheerder' : profile.role === 'admin' ? 'Beheerder' : 'Leerkracht'}</td>
-                        <td>
-                          <button
-                            onClick={async () => {
-                              await toggleUserSchool(profile.id, schoolId, isLinked)
-                              loadData()
-                            }}
-                            className={`${styles.badgeBtn} ${isLinked ? styles.badgeBtnActive : ''}`}
-                          >
-                            {isLinked ? 'Ja (Ontkoppel)' : 'Nee (Koppel)'}
-                          </button>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* KLASSEN OVERZICHT SECTIE */}
       <div className={styles.card}>

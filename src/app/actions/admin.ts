@@ -501,3 +501,37 @@ export async function unlinkTeacherFromSchool(userId: string, schoolId: string) 
   
   return { success: true }
 }
+
+export async function getPlatformUsers() {
+  const supabase = await createClient()
+  if (!(await checkAdmin(supabase))) return { error: 'Geen toegang' }
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, first_name, last_name, role')
+    
+  if (error) return { error: error.message }
+
+  const users = data.map(p => ({
+    id: p.id,
+    name: `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Onbekend',
+    role: p.role
+  })).sort((a, b) => a.name.localeCompare(b.name))
+
+  return { users }
+}
+
+export async function linkTeacherToSchool(userId: string, schoolId: string) {
+  const supabase = await createClient()
+  if (!(await checkAdmin(supabase))) return { error: 'Geen toegang' }
+
+  const { error } = await supabase
+    .from('user_schools')
+    .insert({ user_id: userId, school_id: schoolId })
+
+  if (error) {
+    if (error.code === '23505') return { error: 'Deze leerkracht is al gekoppeld aan deze school.' }
+    return { error: error.message }
+  }
+  return { success: true }
+}

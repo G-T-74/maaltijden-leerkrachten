@@ -17,10 +17,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 2rem;
-  background-color: var(--surface);
-  padding: 1.5rem;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border);
+  align-items: center;
 }
 
 .controlGroup {

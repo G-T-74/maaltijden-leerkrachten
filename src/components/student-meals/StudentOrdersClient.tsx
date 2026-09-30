@@ -172,33 +172,6 @@ export default function StudentOrdersClient({ activeSchoolId }: { activeSchoolId
 
   return (
     <div className={styles.container}>
-      <div className={styles.controlsBar}>
-        <div className={styles.controlGroup}>
-          <label>Kies Klas:</label>
-          <div className={styles.classTiles}>
-            {classes.map(c => (
-              <button 
-                key={c.id} 
-                className={`${styles.classTile} ${activeClassId === c.id ? styles.classTileActive : ''}`}
-                onClick={() => setActiveClassId(c.id)}
-              >
-                {c.name}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className={styles.controlGroup}>
-          <label>Kies Datum:</label>
-          <input 
-            type="date" 
-            value={date} 
-            onChange={e => setDate(e.target.value)}
-            className={styles.dateInput}
-          />
-        </div>
-      </div>
-
       {message && (
         <div className={message.type === 'error' ? styles.alertError : styles.alertSuccess}>
           {message.text}
@@ -219,7 +192,37 @@ export default function StudentOrdersClient({ activeSchoolId }: { activeSchoolId
 
       <div className={styles.matrixCard}>
         <div className={styles.matrixHeader}>
-          <h3>Bestelmatrix ({students.length} leerlingen)</h3>
+          <div className={styles.controlsBar}>
+            <div className={styles.controlGroup}>
+              <label>Kies Klas:</label>
+              <div className={styles.classTiles}>
+                {classes.map(c => (
+                  <button 
+                    key={c.id} 
+                    className={`${styles.classTile} ${activeClassId === c.id ? styles.classTileActive : ''}`}
+                    onClick={() => setActiveClassId(c.id)}
+                  >
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className={styles.controlGroup}>
+              <label>
+                Kies Datum: 
+                <span style={{ fontWeight: 'normal', marginLeft: '0.5rem', color: 'var(--text-muted)' }}>
+                  {new Intl.DateTimeFormat('nl-BE', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date(date))}
+                </span>
+              </label>
+              <input 
+                type="date" 
+                value={date} 
+                onChange={e => setDate(e.target.value)}
+                className={styles.dateInput}
+              />
+            </div>
+          </div>
           <div className={styles.headerActions}>
             <button 
               onClick={handleCopyPrevious} 

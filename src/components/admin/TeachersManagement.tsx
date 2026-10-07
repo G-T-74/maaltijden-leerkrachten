@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getSchoolTeachers, unlinkTeacherFromSchool, getPlatformUsers, linkTeacherToSchool } from '@/app/actions/admin'
+import { getSchoolTeachers, unlinkTeacherFromSchool, getPlatformUsers, linkTeacherToSchool, checkIsSuperAdmin, deletePlatformUser, resetUserPassword } from '@/app/actions/admin'
 import styles from './AdminTabs.module.css'
 
 export default function TeachersManagement({ schoolId }: { schoolId: string }) {
@@ -11,6 +11,7 @@ export default function TeachersManagement({ schoolId }: { schoolId: string }) {
   const [error, setError] = useState('')
   const [selectedUserId, setSelectedUserId] = useState('')
   const [linking, setLinking] = useState(false)
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -20,9 +21,10 @@ export default function TeachersManagement({ schoolId }: { schoolId: string }) {
     setLoading(true)
     setError('')
     
-    const [teachersRes, usersRes] = await Promise.all([
+    const [teachersRes, usersRes, superAdminRes] = await Promise.all([
       getSchoolTeachers(schoolId),
-      getPlatformUsers()
+      getPlatformUsers(),
+      checkIsSuperAdmin()
     ])
 
     if (teachersRes.error) {
@@ -35,6 +37,7 @@ export default function TeachersManagement({ schoolId }: { schoolId: string }) {
       setAllUsers(usersRes.users)
     }
 
+    setIsSuperAdmin(superAdminRes)
     setLoading(false)
   }
 
@@ -60,6 +63,29 @@ export default function TeachersManagement({ schoolId }: { schoolId: string }) {
       loadData()
     }
     setLinking(false)
+  }
+
+  const handleDeleteUser = async (userId: string, userName: string) => {
+    if (!confirm(`LET OP: Weet je zeker dat je het volledige account van ${userName} wilt VERWIJDEREN van het platform? Dit kan niet ongedaan gemaakt worden.`)) return
+    
+    const res = await deletePlatformUser(userId)
+    if (res.error) {
+      alert(`Fout bij verwijderen: ${res.error}`)
+    } else {
+      alert('Gebruiker is succesvol verwijderd.')
+      loadData()
+    }
+  }
+
+  const handleResetPassword = async (userId: string, userName: string) => {
+    if (!confirm(`Weet je zeker dat je een nieuw wachtwoord wilt genereren voor ${userName}?`)) return
+    
+    const res = await resetUserPassword(userId)
+    if (res.error) {
+      alert(`Fout bij resetten: ${res.error}`)
+    } else {
+      alert(`Wachtwoord gereset! Het nieuwe wachtwoord voor ${userName} is: \n\n${res.newPassword}\n\nGeef dit veilig door aan de leerkracht.`)
+    }
   }
 
   if (loading) return <div>Leerkrachten laden...</div>
@@ -134,37 +160,75 @@ export default function TeachersManagement({ schoolId }: { schoolId: string }) {
         {teachers.length === 0 ? (
           <p>Er zijn momenteel geen leerkrachten gekoppeld aan deze school.</p>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-            <thead>
-              <tr style={{ borderBottom: '2px solid var(--border)' }}>
-                <th style={{ padding: '0.75rem 0' }}>Naam</th>
-                <th style={{ padding: '0.75rem 0', width: '100px' }}>Acties</th>
-              </tr>
-            </thead>
-            <tbody>
-              {teachers.map(teacher => (
-                <tr key={teacher.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                  <td style={{ padding: '0.75rem 0', fontWeight: 500 }}>{teacher.name}</td>
-                  <td style={{ padding: '0.75rem 0' }}>
-                    <button 
-                      onClick={() => handleUnlink(teacher.id, teacher.name)}
-                      style={{ 
-                        backgroundColor: 'transparent', 
-                        color: '#ef4444', 
-                        border: '1px solid #ef4444', 
-                        padding: '4px 8px', 
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        fontSize: '0.875rem'
-                      }}
-                    >
-                      Ontkoppel
-                    </button>
-                  </td>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '500px' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid var(--border)' }}>
+                  <th style={{ padding: '0.75rem 0' }}>Naam</th>
+                  <th style={{ padding: '0.75rem 0' }}>Acties</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {teachers.map(teacher => (
+                  <tr key={teacher.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '0.75rem 0', fontWeight: 500 }}>{teacher.name}</td>
+                    <td style={{ padding: '0.75rem 0' }}>
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <button 
+                          onClick={() => handleUnlink(teacher.id, teacher.name)}
+                          style={{ 
+                            backgroundColor: 'transparent', 
+                            color: '#eab308', 
+                            border: '1px solid #eab308', 
+                            padding: '4px 8px', 
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '0.875rem'
+                          }}
+                        >
+                          Ontkoppel
+                        </button>
+
+                        {isSuperAdmin && (
+                          <>
+                            <button 
+                              onClick={() => handleResetPassword(teacher.id, teacher.name)}
+                              style={{ 
+                                backgroundColor: 'transparent', 
+                                color: '#3b82f6', 
+                                border: '1px solid #3b82f6', 
+                                padding: '4px 8px', 
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '0.875rem'
+                              }}
+                            >
+                              Reset Wachtwoord
+                            </button>
+                            
+                            <button 
+                              onClick={() => handleDeleteUser(teacher.id, teacher.name)}
+                              style={{ 
+                                backgroundColor: 'transparent', 
+                                color: '#ef4444', 
+                                border: '1px solid #ef4444', 
+                                padding: '4px 8px', 
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '0.875rem'
+                              }}
+                            >
+                              Verwijder Account
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>

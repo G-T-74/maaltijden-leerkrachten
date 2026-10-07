@@ -535,3 +535,62 @@ export async function linkTeacherToSchool(userId: string, schoolId: string) {
   }
   return { success: true }
 }
+
+// Controleer of de gebruiker een superadmin is
+async function checkSuperAdmin(supabase: any) {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return false
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  return profile?.role === 'superadmin'
+}
+
+export async function checkIsSuperAdmin() {
+  const supabase = await createClient()
+  return await checkSuperAdmin(supabase)
+}
+
+export async function deletePlatformUser(userId: string) {
+  const supabase = await createClient()
+  if (!(await checkSuperAdmin(supabase))) return { error: 'Geen toegang (enkel superadmin)' }
+
+  try {
+    const { createAdminClient } = await import('@/utils/supabase/admin')
+    const adminAuthClient = createAdminClient()
+    
+    // Verwijder de gebruiker via Admin API (verwijdert auth.users en triggert cascade voor profiles)
+    const { error } = await adminAuthClient.auth.admin.deleteUser(userId)
+    
+    if (error) return { error: error.message }
+    return { success: true }
+  } catch (e: any) {
+    return { error: e.message || 'Kon gebruiker niet verwijderen.' }
+  }
+}
+
+export async function resetUserPassword(userId: string, newPassword?: string) {
+  const supabase = await createClient()
+  if (!(await checkSuperAdmin(supabase))) return { error: 'Geen toegang (enkel superadmin)' }
+
+  try {
+    const { createAdminClient } = await import('@/utils/supabase/admin')
+    const adminAuthClient = createAdminClient()
+    
+    // Als geen paswoord is meegegeven, genereer een random paswoord
+    const passwordToSet = newPassword || Math.random().toString(36).slice(-10) + 'A1!'
+    
+    const { data, error } = await adminAuthClient.auth.admin.updateUserById(userId, {
+      password: passwordToSet
+    })
+    
+    if (error) return { error: error.message }
+    return { success: true, newPassword: passwordToSet }
+  } catch (e: any) {
+    return { error: e.message || 'Kon wachtwoord niet resetten.' }
+  }
+}

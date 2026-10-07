@@ -266,3 +266,102 @@ export async function copyPreviousStudentOrders(classId: string, targetDate: str
   revalidatePath('/leerlingen')
   return { success: true, count: newOrders.length }
 }
+
+// --- WEEKWEERGAVE LOGICA ---
+
+export async function getStudentOrderMatrixWeekly(classId: string, schoolId: string, catererId: string, dates: string[]) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Niet ingelogd' }
+
+  // Check welke dagen gelocked zijn
+  const { data: lockData } = await supabase
+    .from('day_locks')
+    .select('lock_date')
+    .eq('school_id', schoolId)
+    .in('lock_date', dates)
+
+  const lockedDates = (lockData || []).map(l => l.lock_date)
+
+  // Haal leerlingen op (niet verborgen)
+  const { data: students, error: studErr } = await supabase
+    .from('students')
+    .select('id, class_number, first_name')
+    .eq('class_id', classId)
+    .eq('is_hidden', false)
+    .order('class_number')
+    
+  if (studErr) return { error: studErr.message }
+
+  // Haal beschikbare maaltijden op voor deze caterer
+  const { data: meals, error: mealsErr } = await supabase
+    .from('student_meals')
+    .select('id, name, price_kleuter, price_lager')
+    .eq('caterer_id', catererId)
+    .eq('is_active', true)
+    .order('name')
+
+  if (mealsErr) return { error: mealsErr.message }
+
+  // Haal reeds geplaatste bestellingen op voor al deze dagen
+  const studentIds = students?.map(s => s.id) || []
+  let orders: any[] = []
+  if (studentIds.length > 0 && dates.length > 0) {
+    const { data: existingOrders } = await supabase
+      .from('student_orders')
+      .select('id, student_id, student_meal_id, quantity, order_date')
+      .in('student_id', studentIds)
+      .in('order_date', dates)
+      
+    if (existingOrders) orders = existingOrders
+  }
+
+  return { 
+    students: students || [], 
+    meals: meals || [], 
+    orders,
+    lockedDates
+  }
+}
+
+export async function saveStudentOrdersBulkWeekly(toInsert: any[], toDeleteIds: string[]) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Niet ingelogd' }
+
+  let hasError = false;
+  let errorMessage = '';
+
+  // Omdat een array van IDs te lang kan worden voor 1 IN clause bij een hele klas x 4 dagen (hoewel 100 max is, meestal ok), 
+  // doen we dit veilig in 1 query zolang het er < 1000 zijn.
+  if (toDeleteIds.length > 0) {
+    const { error } = await supabase
+      .from('student_orders')
+      .delete()
+      .in('id', toDeleteIds)
+    if (error) {
+      hasError = true;
+      errorMessage = error.message;
+    }
+  }
+
+  if (toInsert.length > 0 && !hasError) {
+    const { error } = await supabase
+      .from('student_orders')
+      .insert(toInsert)
+    if (error) {
+      hasError = true;
+      errorMessage = error.message;
+    }
+  }
+
+  if (hasError) {
+    if (errorMessage.includes('is_student_order_allowed')) {
+       return { error: 'Bestellen is niet mogelijk voor een of meerdere van deze datums (afgesloten).' }
+    }
+    return { error: errorMessage }
+  }
+
+  revalidatePath('/leerlingen')
+  return { success: true }
+}

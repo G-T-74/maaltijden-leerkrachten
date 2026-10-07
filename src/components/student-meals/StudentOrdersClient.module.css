@@ -264,3 +264,45 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+.wrapperContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.viewToggle {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  justify-content: center;
+}
+
+.toggleBtn {
+  padding: 0.5rem 1.5rem;
+  border-radius: var(--radius-md);
+  background-color: transparent;
+  color: var(--text-muted);
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.toggleBtn:hover {
+  color: var(--primary);
+  background-color: var(--surface-hover);
+}
+
+.toggleBtnActive {
+  background-color: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+.toggleBtnActive:hover {
+  color: white;
+  background-color: var(--primary-hover);
+}

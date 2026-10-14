@@ -21,9 +21,10 @@ type Meal = {
 
 type OrderFormProps = {
   activeSchool: School
+  preferredCategory?: string
 }
 
-export default function OrderForm({ activeSchool }: OrderFormProps) {
+export default function OrderForm({ activeSchool, preferredCategory }: OrderFormProps) {
   const [meals, setMeals] = useState<Meal[]>([])
   const [selectedSchoolDetails, setSelectedSchoolDetails] = useState<School | null>(null)
   const [selectedMealId, setSelectedMealId] = useState<string>('')
@@ -97,8 +98,16 @@ export default function OrderForm({ activeSchool }: OrderFormProps) {
         
         if (result.meals.length > 0) {
           const uniqueCats = Array.from(new Set(result.meals.map((m: Meal) => m.category))).sort()
-          const warmCat = uniqueCats.find(c => c.toLowerCase().includes('warm'))
-          setSelectedCategory(warmCat || uniqueCats[0])
+          const prefMatch = preferredCategory 
+            ? uniqueCats.find(c => c.toLowerCase() === preferredCategory.toLowerCase()) 
+            : null
+          
+          if (prefMatch) {
+            setSelectedCategory(prefMatch)
+          } else {
+            const warmCat = uniqueCats.find(c => c.toLowerCase().includes('warm'))
+            setSelectedCategory(warmCat || uniqueCats[0])
+          }
         } else {
           setSelectedCategory('')
         }
@@ -107,7 +116,7 @@ export default function OrderForm({ activeSchool }: OrderFormProps) {
     }
     
     loadMeals()
-  }, [activeSchool])
+  }, [activeSchool, preferredCategory])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()

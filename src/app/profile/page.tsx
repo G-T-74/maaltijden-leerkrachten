@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation'
 import { saveSchools } from './actions'
 import styles from './profile.module.css'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { cookies } from 'next/headers'
+import PreferredCategorySetting from '@/components/PreferredCategorySetting'
 
 export default async function ProfilePage() {
   const supabase = await createClient()
@@ -14,19 +16,43 @@ export default async function ProfilePage() {
     redirect('/login')
   }
 
+  const cookieStore = await cookies()
+  const cookiePref = cookieStore.get('defaultMealCategory')?.value
+
   const email = user.email || ''
   const emailPart = email.split('@')[0]
   const firstName = emailPart.split('.')[0]
   const capitalizedFirstName = firstName ? firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase() : ''
 
-  // Haal profiel info op (voor de rol)
-  const { data: profile } = await supabase
+  // Haal profiel info op (voor de rol en voorkeur maaltijdcategorie)
+  let profileData: any = null
+  const { data: pData, error: pErr } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, default_meal_category')
     .eq('id', user.id)
     .single()
 
+  if (!pErr && pData) {
+    profileData = pData
+  } else {
+    const { data: fbProfile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+    profileData = fbProfile
+  }
+
+  const profile = profileData
+  const initialPreferredCategory = profile?.default_meal_category || cookiePref || ''
   const isAdmin = profile?.role === 'admin' || profile?.role === 'superadmin'
+
+  // Haal beschikbare maaltijdcategorieën op
+  const { data: allMeals } = await supabase
+    .from('meals')
+    .select('category')
+    .order('category')
+  const availableCategories = Array.from(new Set((allMeals || []).map(m => m.category))).filter(Boolean) as string[]
 
   // Haal alle beschikbare scholen op
   const { data: schools } = await supabase
@@ -53,6 +79,12 @@ export default async function ProfilePage() {
 
       <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '1rem' }}>Weergave</h2>
       <ThemeToggle />
+
+      <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '1rem', marginTop: '2rem' }}>Standaard maaltijdcategorie</h2>
+      <PreferredCategorySetting 
+        initialCategory={initialPreferredCategory} 
+        availableCategories={availableCategories} 
+      />
 
       <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '1rem' }}>Gekoppelde scholen</h2>
       {isAdmin ? (

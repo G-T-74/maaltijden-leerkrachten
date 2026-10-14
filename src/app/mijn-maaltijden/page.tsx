@@ -19,13 +19,26 @@ export default async function Home(props: { searchParams: Promise<{ school?: str
     redirect('/login')
   }
 
-  // Haal profiel info op (voor de rol)
-  const { data: profile } = await supabase
+  // Haal profiel info op (voor de rol en voorkeur maaltijdcategorie)
+  let profileData: any = null
+  const { data: pData, error: pErr } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, default_meal_category')
     .eq('id', user.id)
     .single()
 
+  if (!pErr && pData) {
+    profileData = pData
+  } else {
+    const { data: fbProfile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+    profileData = fbProfile
+  }
+
+  const profile = profileData
   const isAdmin = profile?.role === 'admin' || profile?.role === 'superadmin'
 
   const emailPart = user.email ? user.email.split('@')[0] : ''
@@ -71,6 +84,7 @@ export default async function Home(props: { searchParams: Promise<{ school?: str
 
   const cookieStore = await cookies()
   const cookieSchoolId = cookieStore.get('activeSchoolId')?.value
+  const preferredCategory = profile?.default_meal_category || cookieStore.get('defaultMealCategory')?.value || ''
 
   let activeSchoolId = searchParams?.school || cookieSchoolId || formattedSchools[0].school.id
   
@@ -176,7 +190,7 @@ export default async function Home(props: { searchParams: Promise<{ school?: str
       
       <SyncSchoolCookie activeSchoolId={activeSchoolId} />
       
-      <OrderForm activeSchool={activeSchoolDetails} />
+      <OrderForm activeSchool={activeSchoolDetails} preferredCategory={preferredCategory} />
       
       <OrderOverview orders={(orders as any) || []} availableMeals={availableMeals} />
 

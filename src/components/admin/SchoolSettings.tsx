@@ -1,13 +1,14 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getSchoolsWithDeadlines, updateSchoolDeadline, exportYearlyData, resetSchoolYear } from '@/app/actions/admin'
+import { getSchoolsWithDeadlines, updateSchoolDeadline, updateSchoolStudentDeadline, exportYearlyData, resetSchoolYear } from '@/app/actions/admin'
 import styles from './SchoolSettings.module.css'
 
 type School = {
   id: string
   name: string
   order_deadline: string | null
+  student_order_deadline?: string | null
   apply_toddler_factor: boolean
 }
 
@@ -19,6 +20,7 @@ export default function SchoolSettings() {
 
   // Local state for editing deadlines
   const [deadlines, setDeadlines] = useState<Record<string, string>>({})
+  const [studentDeadlines, setStudentDeadlines] = useState<Record<string, string>>({})
   const [toddlerFactors, setToddlerFactors] = useState<Record<string, boolean>>({})
   const [savingId, setSavingId] = useState<string | null>(null)
   const [resettingId, setResettingId] = useState<string | null>(null)
@@ -37,6 +39,7 @@ export default function SchoolSettings() {
       } else if (res.schools) {
         setSchools(res.schools)
         const initialDeadlines: Record<string, string> = {}
+        const initialStudentDeadlines: Record<string, string> = {}
         const initialFactors: Record<string, boolean> = {}
         res.schools.forEach((s: School) => {
           // Format time to HH:MM if it has seconds
@@ -45,9 +48,17 @@ export default function SchoolSettings() {
             dl = dl.substring(0, 5)
           }
           initialDeadlines[s.id] = dl
+
+          let studentDl = s.student_order_deadline || '08:15:00'
+          if (studentDl.split(':').length === 3) {
+            studentDl = studentDl.substring(0, 5)
+          }
+          initialStudentDeadlines[s.id] = studentDl
+
           initialFactors[s.id] = s.apply_toddler_factor || false
         })
         setDeadlines(initialDeadlines)
+        setStudentDeadlines(initialStudentDeadlines)
         setToddlerFactors(initialFactors)
       }
       setLoading(false)
@@ -57,6 +68,10 @@ export default function SchoolSettings() {
 
   const handleDeadlineChange = (schoolId: string, val: string) => {
     setDeadlines(prev => ({ ...prev, [schoolId]: val }))
+  }
+
+  const handleStudentDeadlineChange = (schoolId: string, val: string) => {
+    setStudentDeadlines(prev => ({ ...prev, [schoolId]: val }))
   }
 
   const handleFactorChange = (schoolId: string, checked: boolean) => {
@@ -69,21 +84,27 @@ export default function SchoolSettings() {
     setSuccessMsg(null)
     
     // Add seconds if not present because time type in PostgreSQL expects it
-    let timeToSave = deadlines[schoolId]
+    let timeToSave = deadlines[schoolId] || '08:15'
     if (timeToSave.length === 5) {
       timeToSave += ':00'
     }
 
-    const res = await updateSchoolDeadline(schoolId, timeToSave)
+    let studentTimeToSave = studentDeadlines[schoolId] || '08:15'
+    if (studentTimeToSave.length === 5) {
+      studentTimeToSave += ':00'
+    }
+
+    const resTeacher = await updateSchoolDeadline(schoolId, timeToSave)
+    const resStudent = await updateSchoolStudentDeadline(schoolId, studentTimeToSave)
     
     // Also save the toddler factor
     const { updateSchoolToddlerFactor } = await import('@/app/actions/admin')
     const resFactor = await updateSchoolToddlerFactor(schoolId, toddlerFactors[schoolId])
 
-    if (res.error || resFactor.error) {
-      setError(res.error || resFactor.error || 'Er is een fout opgetreden.')
+    if (resTeacher.error || resStudent.error || resFactor.error) {
+      setError(resTeacher.error || resStudent.error || resFactor.error || 'Er is een fout opgetreden.')
     } else {
-      setSuccessMsg('Deadline succesvol opgeslagen.')
+      setSuccessMsg('Instellingen succesvol opgeslagen.')
       setTimeout(() => setSuccessMsg(null), 3000)
     }
     setSavingId(null)
@@ -142,7 +163,7 @@ export default function SchoolSettings() {
         School Instellingen
       </h2>
       <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>
-        Beheer hier de dagelijkse besteldeadline per school. Na dit uur kunnen leerkrachten geen maaltijden meer bestellen voor dezelfde dag.
+        Beheer hier de dagelijkse besteldeadlines per school voor leerkrachten en leerlingen. Na dit uur kunnen geen maaltijden meer besteld of gewijzigd worden voor dezelfde dag.
       </p>
 
       {error && <div style={{ color: 'var(--primary)', marginBottom: '1rem' }}>{error}</div>}
@@ -153,7 +174,8 @@ export default function SchoolSettings() {
           <thead>
             <tr>
               <th>School</th>
-              <th>Bestel Deadline</th>
+              <th>deadline lkn</th>
+              <th>deadline lln</th>
               <th>Kleuterfactor (2/3) toepassen</th>
               <th>Actie</th>
             </tr>
@@ -168,6 +190,14 @@ export default function SchoolSettings() {
                     className={styles.input}
                     value={deadlines[school.id] || ''}
                     onChange={e => handleDeadlineChange(school.id, e.target.value)}
+                  />
+                </td>
+                <td>
+                  <input 
+                    type="time" 
+                    className={styles.input}
+                    value={studentDeadlines[school.id] || ''}
+                    onChange={e => handleStudentDeadlineChange(school.id, e.target.value)}
                   />
                 </td>
                 <td>
@@ -194,7 +224,7 @@ export default function SchoolSettings() {
             ))}
             {schools.length === 0 && (
               <tr>
-                <td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
+                <td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
                   Geen scholen gevonden.
                 </td>
               </tr>

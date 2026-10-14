@@ -186,7 +186,7 @@ export default function StudentOrdersDailyClient({ activeSchoolId }: { activeSch
 
       {isLocked && (
         <div className={styles.alertWarning}>
-          Deze dag is reeds afgesloten door de beheerder. Je kan geen wijzigingen meer doorvoeren.
+          Deze dag is reeds afgesloten door de beheerder of de besteldeadline voor leerlingen is verstreken. Je kan geen wijzigingen meer doorvoeren.
         </div>
       )}
 

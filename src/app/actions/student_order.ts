@@ -74,21 +74,67 @@ export async function getTeacherClasses() {
   }
 }
 
+function getBrusselsNow() {
+  const formatter = new Intl.DateTimeFormat('en-CA', { 
+    timeZone: 'Europe/Brussels', 
+    year: 'numeric', month: '2-digit', day: '2-digit', 
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false 
+  })
+  const parts = formatter.formatToParts(new Date()).reduce((acc: any, p) => Object.assign(acc, { [p.type]: p.value }), {})
+  return {
+    todayStr: `${parts.year}-${parts.month}-${parts.day}`,
+    currentTimeStr: `${parts.hour}:${parts.minute}:${parts.second}`
+  }
+}
+
+function isDeadlinePassedForDate(targetDate: string, deadlineTime: string): boolean {
+  const { todayStr, currentTimeStr } = getBrusselsNow()
+  if (targetDate < todayStr) return true
+  if (targetDate === todayStr) {
+    const targetDeadline = (deadlineTime && deadlineTime.length === 5) ? `${deadlineTime}:00` : (deadlineTime || '08:15:00')
+    return currentTimeStr >= targetDeadline
+  }
+  return false
+}
+
+async function getSchoolStudentDeadline(supabase: any, schoolId: string): Promise<string> {
+  const { data: sData, error: sErr } = await supabase
+    .from('schools')
+    .select('student_order_deadline, order_deadline')
+    .eq('id', schoolId)
+    .single()
+
+  if (!sErr && sData) {
+    return sData.student_order_deadline || sData.order_deadline || '08:15:00'
+  }
+
+  const { data: fbData } = await supabase
+    .from('schools')
+    .select('order_deadline')
+    .eq('id', schoolId)
+    .single()
+
+  return fbData?.order_deadline || '08:15:00'
+}
+
 // 2. Haal leerlingen, maaltijden en geplaatste bestellingen op voor een specifieke datum
 export async function getStudentOrderMatrix(classId: string, schoolId: string, catererId: string, date: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Niet ingelogd' }
 
-  // Check of de dag gelocked is
-  const { data: lockData } = await supabase
-    .from('day_locks')
-    .select('lock_date')
-    .eq('school_id', schoolId)
-    .eq('lock_date', date)
-    .single()
+  // Check of de dag gelocked is of deadline verstreken
+  const [lockRes, schoolDeadline] = await Promise.all([
+    supabase
+      .from('day_locks')
+      .select('lock_date')
+      .eq('school_id', schoolId)
+      .eq('lock_date', date)
+      .single(),
+    getSchoolStudentDeadline(supabase, schoolId)
+  ])
 
-  const isLocked = !!lockData
+  const isLocked = !!lockRes.data || isDeadlinePassedForDate(date, schoolDeadline)
 
   // Haal leerlingen op (niet verborgen)
   const { data: students, error: studErr } = await supabase
@@ -274,14 +320,23 @@ export async function getStudentOrderMatrixWeekly(classId: string, schoolId: str
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Niet ingelogd' }
 
-  // Check welke dagen gelocked zijn
-  const { data: lockData } = await supabase
-    .from('day_locks')
-    .select('lock_date')
-    .eq('school_id', schoolId)
-    .in('lock_date', dates)
+  // Check welke dagen gelocked zijn of waarvan de deadline is verstreken
+  const [lockRes, schoolDeadline] = await Promise.all([
+    supabase
+      .from('day_locks')
+      .select('lock_date')
+      .eq('school_id', schoolId)
+      .in('lock_date', dates),
+    getSchoolStudentDeadline(supabase, schoolId)
+  ])
 
-  const lockedDates = (lockData || []).map(l => l.lock_date)
+  const lockedDates = (lockRes.data || []).map((l: any) => l.lock_date)
+
+  for (const d of dates) {
+    if (!lockedDates.includes(d) && isDeadlinePassedForDate(d, schoolDeadline)) {
+      lockedDates.push(d)
+    }
+  }
 
   // Haal leerlingen op (niet verborgen)
   const { data: students, error: studErr } = await supabase

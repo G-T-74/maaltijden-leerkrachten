@@ -45,13 +45,26 @@ export async function getSchoolsWithDeadlines() {
 
   if (schoolIds.length === 0) return { schools: [], activeSchoolId: null }
 
-  const { data, error } = await supabase
+  // Probeer met student_order_deadline
+  let { data, error } = await supabase
     .from('schools')
-    .select('id, name, order_deadline, caterer_id, apply_toddler_factor')
+    .select('id, name, order_deadline, student_order_deadline, caterer_id, apply_toddler_factor')
     .in('id', schoolIds)
     .order('name')
 
-  if (error) return { error: error.message }
+  if (error && (error.code === '42703' || error.message?.includes('student_order_deadline'))) {
+    // Fallback als de kolom nog niet gemigreerd is in Supabase
+    const fallbackRes = await supabase
+      .from('schools')
+      .select('id, name, order_deadline, caterer_id, apply_toddler_factor')
+      .in('id', schoolIds)
+      .order('name')
+    if (fallbackRes.error) return { error: fallbackRes.error.message }
+    data = fallbackRes.data?.map(s => ({ ...s, student_order_deadline: null })) || []
+  } else if (error) {
+    return { error: error.message }
+  }
+
   return { schools: data, activeSchoolId: profile?.active_admin_school_id }
 }
 
@@ -82,6 +95,27 @@ export async function updateSchoolDeadline(schoolId: string, deadline: string) {
   
   revalidatePath('/admin')
   revalidatePath('/')
+  return { success: true }
+}
+
+export async function updateSchoolStudentDeadline(schoolId: string, deadline: string) {
+  const supabase = await createClient()
+  if (!(await checkAdmin(supabase))) return { error: 'Geen toegang' }
+
+  const { error } = await supabase
+    .from('schools')
+    .update({ student_order_deadline: deadline })
+    .eq('id', schoolId)
+
+  if (error) {
+    if (error.code === '42703' || error.message?.includes('student_order_deadline')) {
+      return { error: 'Kolom student_order_deadline ontbreekt nog in Supabase. Voer het SQL script supabase_phase15_student_deadline.sql uit.' }
+    }
+    return { error: error.message }
+  }
+  
+  revalidatePath('/admin')
+  revalidatePath('/leerlingen')
   return { success: true }
 }
 

@@ -137,6 +137,17 @@ export default function OrderForm({ activeSchool, preferredCategory }: OrderForm
     setLoading(false)
   }
 
+  const formattedDayString = orderDate ? (() => {
+    try {
+      const parts = orderDate.split('-').map(Number)
+      if (parts.length === 3) {
+        const d = new Date(parts[0], parts[1] - 1, parts[2])
+        return new Intl.DateTimeFormat('nl-BE', { weekday: 'long', day: 'numeric', month: 'long' }).format(d)
+      }
+    } catch {}
+    return ''
+  })() : ''
+
   return (
     <div className={styles.formContainer}>
 
@@ -147,9 +158,17 @@ export default function OrderForm({ activeSchool, preferredCategory }: OrderForm
         <input type="hidden" name="school_id" value={activeSchool.id} />
         
         <div className={styles.formGroup}>
-          <label htmlFor="date">Voor welke datum bestel je?</label>
+          <label htmlFor="date" className={styles.label}>
+            Voor welke datum bestel je?
+            {formattedDayString && (
+              <span style={{ fontWeight: 600, marginLeft: '0.5rem', color: 'var(--primary)' }}>
+                ({formattedDayString})
+              </span>
+            )}
+          </label>
           <input 
             type="date" 
+            id="date"
             name="order_date" 
             className={`${styles.input} ${isWeekend ? styles.inputError : ''}`}
             value={orderDate}

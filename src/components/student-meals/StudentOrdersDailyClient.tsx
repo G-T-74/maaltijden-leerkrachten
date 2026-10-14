@@ -170,6 +170,20 @@ export default function StudentOrdersDailyClient({ activeSchoolId }: { activeSch
 
   const disabled = isLocked || isWeekendOrWednesday()
 
+  // Check of er niet-opgeslagen wijzigingen zijn t.o.v. initialOrders
+  const hasUnsavedChanges = (() => {
+    const currentKeys = Object.keys(currentOrders)
+    if (currentKeys.length !== initialOrders.length) return true
+    for (const initOrder of initialOrders) {
+      if (currentOrders[initOrder.student_id] !== initOrder.student_meal_id) {
+        return true
+      }
+    }
+    return false
+  })()
+
+  const isAllSaved = initialOrders.length > 0 && !hasUnsavedChanges
+
   return (
     <div className={styles.container}>
       {message && (
@@ -235,9 +249,9 @@ export default function StudentOrdersDailyClient({ activeSchoolId }: { activeSch
               onClick={handleSave} 
               disabled={disabled || saving}
               className={`${styles.btn} ${styles.btnPrimary}`}
-              style={initialOrders.length > 0 ? { backgroundColor: '#2e7d32', borderColor: '#1b5e20', color: 'white' } : {}}
+              style={isAllSaved ? { backgroundColor: '#2e7d32', borderColor: '#1b5e20', color: 'white' } : {}}
             >
-              {saving ? 'Opslaan...' : (initialOrders.length > 0 ? '💾 Bestelling Opgeslagen' : '💾 Bestelling Opslaan')}
+              {saving ? 'Opslaan...' : (isAllSaved ? '💾 Bestelling Opgeslagen' : (initialOrders.length > 0 ? '💾 Wijzigingen Opslaan' : '💾 Bestelling Opslaan'))}
             </button>
           </div>
         </div>
@@ -262,13 +276,14 @@ export default function StudentOrdersDailyClient({ activeSchoolId }: { activeSch
                   <td className={styles.tdName}>{student.first_name}</td>
                   {meals.map(m => {
                     const isChecked = currentOrders[student.id] === m.id
+                    const isSaved = isChecked && initialOrders.some((o: any) => o.student_id === student.id && o.student_meal_id === m.id)
                     return (
                       <td 
                         key={m.id} 
                         className={styles.tdCheckbox}
                         onClick={() => handleCheckboxChange(student.id, m.id)}
                       >
-                        <div className={`${styles.hitbox} ${isChecked ? styles.hitboxActive : ''} ${disabled ? styles.hitboxDisabled : ''}`}>
+                        <div className={`${styles.hitbox} ${isChecked ? (isSaved ? styles.hitboxSaved : styles.hitboxActive) : ''} ${disabled ? styles.hitboxDisabled : ''}`}>
                           {isChecked && '✓'}
                         </div>
                       </td>

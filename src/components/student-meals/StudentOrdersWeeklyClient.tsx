@@ -218,6 +218,25 @@ export default function StudentOrdersWeeklyClient({ activeSchoolId }: { activeSc
     )
   }
 
+  // Check of er niet-opgeslagen wijzigingen zijn in de week
+  const hasUnsavedChanges = (() => {
+    for (const student of students) {
+      for (const date of weekDates) {
+        if (lockedDates.includes(date)) continue
+        const cur = currentOrders[student.id]?.[date] || ''
+        const init = initialOrders[student.id]?.[date]?.meal_id || ''
+        if (cur !== init) return true
+      }
+    }
+    return false
+  })()
+
+  const hasAnySavedOrders = Object.values(initialOrders).some(dayOrders => 
+    Object.values(dayOrders).some((o: any) => o && o.meal_id)
+  )
+
+  const isAllSaved = hasAnySavedOrders && !hasUnsavedChanges
+
   return (
     <div className={styles.container}>
       <div className={styles.matrixCard}>
@@ -265,8 +284,9 @@ export default function StudentOrdersWeeklyClient({ activeSchoolId }: { activeSc
               onClick={handleSave} 
               disabled={saving}
               className={`${styles.btn} ${styles.btnPrimary}`}
+              style={isAllSaved ? { backgroundColor: '#2e7d32', borderColor: '#1b5e20', color: 'white' } : {}}
             >
-              {saving ? 'Opslaan...' : '💾 Bestellingen Opslaan'}
+              {saving ? 'Opslaan...' : (isAllSaved ? '💾 Bestellingen Opgeslagen' : (hasAnySavedOrders ? '💾 Wijzigingen Opslaan' : '💾 Bestellingen Opslaan'))}
             </button>
           </div>
         </div>
@@ -301,6 +321,10 @@ export default function StudentOrdersWeeklyClient({ activeSchoolId }: { activeSc
                   {weekDates.map(date => {
                     const isLocked = lockedDates.includes(date)
                     const val = currentOrders[student.id]?.[date] || ''
+                    const initialMealId = initialOrders[student.id]?.[date]?.meal_id || ''
+                    const isSelected = !!val
+                    const isSaved = isSelected && val === initialMealId
+
                     return (
                       <td key={date} className={styles.tdCheckbox} style={{ padding: '0.5rem' }}>
                         <select 
@@ -311,10 +335,22 @@ export default function StudentOrdersWeeklyClient({ activeSchoolId }: { activeSc
                             width: '100%',
                             padding: '0.5rem',
                             borderRadius: '4px',
-                            border: '1px solid var(--border)',
-                            backgroundColor: isLocked ? 'var(--surface-hover)' : 'var(--background)',
-                            color: 'var(--text-main)',
-                            opacity: isLocked ? 0.7 : 1
+                            border: isSelected 
+                              ? (isSaved ? '2px solid #2e7d32' : '2px solid var(--primary)') 
+                              : '1px solid var(--border)',
+                            backgroundColor: isLocked 
+                              ? 'var(--surface-hover)' 
+                              : (isSelected 
+                                  ? (isSaved ? 'rgba(46, 125, 50, 0.12)' : 'var(--primary-glow)') 
+                                  : 'var(--background)'),
+                            color: isLocked 
+                              ? 'var(--text-muted)' 
+                              : (isSelected 
+                                  ? (isSaved ? '#166534' : 'var(--primary)') 
+                                  : 'var(--text-main)'),
+                            fontWeight: isSelected ? 600 : 400,
+                            opacity: isLocked ? 0.7 : 1,
+                            transition: 'all 0.2s'
                           }}
                         >
                           <option value="">- Geen -</option>

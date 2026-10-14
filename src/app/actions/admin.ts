@@ -48,7 +48,7 @@ export async function getSchoolsWithDeadlines() {
   // Probeer met student_order_deadline
   let { data, error } = await supabase
     .from('schools')
-    .select('id, name, order_deadline, student_order_deadline, caterer_id, apply_toddler_factor')
+    .select('id, name, logo_url, order_deadline, student_order_deadline, caterer_id, apply_toddler_factor')
     .in('id', schoolIds)
     .order('name')
 
@@ -56,7 +56,7 @@ export async function getSchoolsWithDeadlines() {
     // Fallback als de kolom nog niet gemigreerd is in Supabase
     const fallbackRes = await supabase
       .from('schools')
-      .select('id, name, order_deadline, caterer_id, apply_toddler_factor')
+      .select('id, name, logo_url, order_deadline, caterer_id, apply_toddler_factor')
       .in('id', schoolIds)
       .order('name')
     if (fallbackRes.error) return { error: fallbackRes.error.message }

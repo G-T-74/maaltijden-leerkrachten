@@ -1,7 +1,16 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getSchoolsWithDeadlines, updateSchoolDeadline, updateSchoolStudentDeadline, exportYearlyData, resetSchoolYear } from '@/app/actions/admin'
+import { 
+  getSchoolsWithDeadlines, 
+  updateSchoolDeadline, 
+  updateSchoolStudentDeadline, 
+  exportYearlyData, 
+  resetSchoolYear,
+  unlockDayForSchool,
+  getActiveDayUnlocks,
+  removeDayUnlock
+} from '@/app/actions/admin'
 import styles from './SchoolSettings.module.css'
 
 type School = {
@@ -10,6 +19,43 @@ type School = {
   order_deadline: string | null
   student_order_deadline?: string | null
   apply_toddler_factor: boolean
+}
+
+function getTodayBrussels() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Brussels' }).format(new Date())
+}
+
+function formatUnlockDate(dateStr: string) {
+  try {
+    const d = new Date(dateStr + 'T12:00:00')
+    return new Intl.DateTimeFormat('nl-BE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(d)
+  } catch {
+    return dateStr
+  }
+}
+
+function formatOpenUntil(isoStr: string) {
+  try {
+    const target = new Date(isoStr)
+    const now = new Date()
+    const diffMs = target.getTime() - now.getTime()
+    const diffMins = Math.round(diffMs / 60000)
+
+    const timeStr = target.toLocaleTimeString('nl-BE', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Brussels' })
+    const dateStr = target.toLocaleDateString('nl-BE', { day: 'numeric', month: 'numeric', timeZone: 'Europe/Brussels' })
+    
+    if (diffMins <= 0) {
+      return `Verlopen om ${timeStr}`
+    } else if (diffMins < 60) {
+      return `Tot ${timeStr} (nog ${diffMins} min)`
+    } else {
+      const hours = Math.floor(diffMins / 60)
+      const mins = diffMins % 60
+      return `Tot ${dateStr} ${timeStr} (nog ${hours}u ${mins > 0 ? mins + 'm' : ''})`
+    }
+  } catch {
+    return isoStr
+  }
 }
 
 export default function SchoolSettings() {
@@ -24,12 +70,30 @@ export default function SchoolSettings() {
   const [toddlerFactors, setToddlerFactors] = useState<Record<string, boolean>>({})
   const [savingId, setSavingId] = useState<string | null>(null)
   const [resettingId, setResettingId] = useState<string | null>(null)
+
+  // Day unlocks state
+  const [activeUnlocks, setActiveUnlocks] = useState<any[]>([])
+  const [unlockSchoolId, setUnlockSchoolId] = useState<string>('')
+  const [unlockDate, setUnlockDate] = useState<string>(getTodayBrussels())
+  const [unlockDuration, setUnlockDuration] = useState<number>(30)
+  const [showConfirmModal, setShowConfirmModal] = useState<boolean>(false)
+  const [isSubmittingUnlock, setIsSubmittingUnlock] = useState<boolean>(false)
+  const [removingUnlockId, setRemovingUnlockId] = useState<string | null>(null)
+  const [unlockError, setUnlockError] = useState<string | null>(null)
+  const [unlockSuccess, setUnlockSuccess] = useState<string | null>(null)
   
   // Controleer of we in de toegestane periode zitten (25 juni t.e.m. 15 juli)
   const now = new Date();
   const currentMonth = now.getMonth(); // 0=Jan, 5=Jun, 6=Jul
   const currentDay = now.getDate();
   const isResetAllowed = (currentMonth === 5 && currentDay >= 25) || (currentMonth === 6 && currentDay <= 15);
+
+  const loadUnlocks = async () => {
+    const res = await getActiveDayUnlocks()
+    if (res.unlocks) {
+      setActiveUnlocks(res.unlocks)
+    }
+  }
 
   useEffect(() => {
     async function loadData() {
@@ -60,11 +124,24 @@ export default function SchoolSettings() {
         setDeadlines(initialDeadlines)
         setStudentDeadlines(initialStudentDeadlines)
         setToddlerFactors(initialFactors)
+
+        if (res.schools.length > 0) {
+          setUnlockSchoolId(prev => prev || res.schools[0].id)
+        }
       }
       setLoading(false)
     }
     loadData()
+    loadUnlocks()
   }, [])
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadUnlocks()
+    }, 60000)
+    return () => clearInterval(interval)
+  }, [])
+
 
   const handleDeadlineChange = (schoolId: string, val: string) => {
     setDeadlines(prev => ({ ...prev, [schoolId]: val }))
@@ -155,7 +232,58 @@ export default function SchoolSettings() {
     setResettingId(null)
   }
 
+  const isFutureDate = unlockDate > getTodayBrussels()
+
+  const handleOpenConfirm = () => {
+    if (!unlockSchoolId) {
+      setUnlockError('Selecteer een school.')
+      return
+    }
+    if (!unlockDate) {
+      setUnlockError('Selecteer een datum.')
+      return
+    }
+    setUnlockError(null)
+    setShowConfirmModal(true)
+  }
+
+  const handleExecuteUnlock = async () => {
+    setIsSubmittingUnlock(true)
+    setUnlockError(null)
+    setUnlockSuccess(null)
+
+    const res = await unlockDayForSchool(unlockSchoolId, unlockDate, unlockDuration)
+    if (res.error) {
+      setUnlockError(res.error)
+      setShowConfirmModal(false)
+    } else {
+      const schoolName = schools.find(s => s.id === unlockSchoolId)?.name || 'de geselecteerde school'
+      setUnlockSuccess(`Dag succesvol opengesteld voor ${schoolName}!`)
+      setShowConfirmModal(false)
+      loadUnlocks()
+      setTimeout(() => setUnlockSuccess(null), 5000)
+    }
+    setIsSubmittingUnlock(false)
+  }
+
+  const handleRemoveUnlock = async (id: string, schoolName: string, dateStr: string) => {
+    if (!confirm(`Weet je zeker dat je de openstelling voor ${schoolName} op ${formatUnlockDate(dateStr)} nu wilt sluiten?`)) {
+      return
+    }
+    setRemovingUnlockId(id)
+    const res = await removeDayUnlock(id)
+    if (res.error) {
+      setUnlockError(res.error)
+    } else {
+      setUnlockSuccess('Openstelling succesvol beëindigd.')
+      loadUnlocks()
+      setTimeout(() => setUnlockSuccess(null), 3000)
+    }
+    setRemovingUnlockId(null)
+  }
+
   if (loading) return <div>Laden...</div>
+
 
   return (
     <div>
@@ -232,6 +360,194 @@ export default function SchoolSettings() {
           </tbody>
         </table>
       </div>
+
+      {/* 🔓 DAG OPNIEUW OPENSTELLEN */}
+      <div className={styles.card}>
+        <div className={styles.cardTitle}>
+          <span>🔓</span>
+          <h3>Dag (Opnieuw) Openstellen voor Bestellingen</h3>
+        </div>
+        <p className={styles.cardDescription}>
+          Geef leerkrachten uitzonderlijk de mogelijkheid om maaltijden in te voeren of aan te passen na het verstrijken van de deadline.
+          Dit kan voor vandaag zijn (wanneer leerkrachten te laat zijn), voor een datum in het verleden (ook woensdag), of voor een toekomstige dag.
+        </p>
+
+        {unlockError && (
+          <div style={{ color: 'var(--primary)', marginBottom: '1rem', padding: '0.75rem', background: 'rgba(243, 53, 75, 0.1)', borderRadius: '6px' }}>
+            {unlockError}
+          </div>
+        )}
+        {unlockSuccess && (
+          <div style={{ color: '#16a34a', marginBottom: '1rem', padding: '0.75rem', background: 'rgba(34, 197, 94, 0.1)', borderRadius: '6px' }}>
+            {unlockSuccess}
+          </div>
+        )}
+
+        <div className={styles.formGrid}>
+          <div className={styles.formGroup}>
+            <label>School:</label>
+            <select 
+              className={styles.select}
+              value={unlockSchoolId}
+              onChange={e => setUnlockSchoolId(e.target.value)}
+            >
+              {schools.map(s => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className={styles.formGroup}>
+            <label>Datum:</label>
+            <input 
+              type="date"
+              className={styles.dateInput}
+              value={unlockDate}
+              onChange={e => setUnlockDate(e.target.value)}
+            />
+          </div>
+
+          <div className={styles.formGroup}>
+            <label>Duur van de openstelling:</label>
+            {isFutureDate ? (
+              <input 
+                type="text" 
+                className={styles.select} 
+                disabled 
+                value="Tot standaardsluitingsuur van die ochtend" 
+              />
+            ) : (
+              <select 
+                className={styles.select}
+                value={unlockDuration}
+                onChange={e => setUnlockDuration(Number(e.target.value))}
+              >
+                <option value={15}>15 minuten</option>
+                <option value={30}>30 minuten (standaard)</option>
+                <option value={60}>1 uur</option>
+                <option value={120}>2 uur</option>
+                <option value={-1}>Tot einde van de dag (23:59)</option>
+              </select>
+            )}
+          </div>
+
+          <div>
+            <button 
+              className={styles.btn}
+              onClick={handleOpenConfirm}
+              style={{ height: '42px', whiteSpace: 'nowrap' }}
+            >
+              Dag Openstellen
+            </button>
+          </div>
+        </div>
+
+        {isFutureDate && (
+          <div className={styles.infoNote}>
+            ℹ️ Aangezien de gekozen datum in de toekomst ligt, wordt automatisch het standaard sluitingsuur (bv. 08:15) op die ochtend gehanteerd.
+          </div>
+        )}
+
+        {/* ACTIEVE OPENSTELLINGEN LIJST */}
+        <div className={styles.activeTableContainer}>
+          <div className={styles.activeTableTitle}>
+            <span>🕒</span>
+            <span>Momenteel actieve openstellingen ({activeUnlocks.length})</span>
+          </div>
+
+          {activeUnlocks.length === 0 ? (
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontStyle: 'italic' }}>
+              Er zijn momenteel geen uitzonderlijke openstellingen actief.
+            </p>
+          ) : (
+            <div className={styles.tableContainer}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th>School</th>
+                    <th>Betreft Datum</th>
+                    <th>Status / Open Tot</th>
+                    <th>Actie</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {activeUnlocks.map(u => (
+                    <tr key={u.id}>
+                      <td style={{ fontWeight: 600 }}>{u.schools?.name || 'Onbekend'}</td>
+                      <td>{formatUnlockDate(u.unlock_date)}</td>
+                      <td>
+                        <span className={styles.badge}>
+                          ● {formatOpenUntil(u.open_until)}
+                        </span>
+                      </td>
+                      <td>
+                        <button 
+                          className={styles.btnDanger}
+                          onClick={() => handleRemoveUnlock(u.id, u.schools?.name || 'School', u.unlock_date)}
+                          disabled={removingUnlockId === u.id}
+                        >
+                          {removingUnlockId === u.id ? 'Bezig...' : 'Nu sluiten'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* BEVESTIGINGSMODAL */}
+      {showConfirmModal && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modal}>
+            <h3 className={styles.modalTitle}>Bevestig Openstelling</h3>
+            <div className={styles.modalBody}>
+              <p>Weet je zeker dat je bestellingen wilt toelaten voor de volgende selectie?</p>
+              <div className={styles.modalDetails}>
+                <div>
+                  <span>School:</span>
+                  <span>{schools.find(s => s.id === unlockSchoolId)?.name}</span>
+                </div>
+                <div>
+                  <span>Datum van de maaltijden:</span>
+                  <span>{formatUnlockDate(unlockDate)}</span>
+                </div>
+                <div>
+                  <span>Geldigheid:</span>
+                  <span>
+                    {isFutureDate 
+                      ? 'Tot standaard sluitingsuur op die ochtend' 
+                      : unlockDuration === -1 
+                        ? 'Tot het einde van vandaag (23:59)' 
+                        : `${unlockDuration} minuten`}
+                  </span>
+                </div>
+              </div>
+              <p style={{ fontSize: '0.85rem' }}>
+                Leerkrachten van deze school kunnen gedurende deze periode maaltijden doorgeven of wijzigen voor de geselecteerde dag.
+              </p>
+            </div>
+            <div className={styles.modalActions}>
+              <button 
+                className={styles.btnSecondary}
+                onClick={() => setShowConfirmModal(false)}
+                disabled={isSubmittingUnlock}
+              >
+                Annuleren
+              </button>
+              <button 
+                className={styles.btn}
+                onClick={handleExecuteUnlock}
+                disabled={isSubmittingUnlock}
+              >
+                {isSubmittingUnlock ? 'Bezig met openstellen...' : 'Ja, Dag Openstellen'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isResetAllowed && (
         <div style={{ marginTop: '4rem', padding: '2rem', border: '1px solid var(--primary)', borderRadius: '8px', backgroundColor: 'rgba(255,59,48,0.05)' }}>

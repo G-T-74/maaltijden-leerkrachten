@@ -628,3 +628,149 @@ export async function resetUserPassword(userId: string, newPassword?: string) {
     return { error: e.message || 'Kon wachtwoord niet resetten.' }
   }
 }
+
+// --- TIJDELIJKE OPENSTELLINGEN (DAY UNLOCKS) ---
+
+function getBrusselsNowAdmin() {
+  const formatter = new Intl.DateTimeFormat('en-CA', { 
+    timeZone: 'Europe/Brussels', 
+    year: 'numeric', month: '2-digit', day: '2-digit', 
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false 
+  })
+  const parts = formatter.formatToParts(new Date()).reduce((acc: any, p) => Object.assign(acc, { [p.type]: p.value }), {})
+  return {
+    todayStr: `${parts.year}-${parts.month}-${parts.day}`,
+    currentTimeStr: `${parts.hour}:${parts.minute}:${parts.second}`
+  }
+}
+
+function getBrusselsISOAdmin(dateStr: string, timeStr: string): string {
+  const [year, month, day] = dateStr.split('-').map(Number)
+  const [hour, minute, second = 0] = timeStr.split(':').map(Number)
+  
+  const testUtc = new Date(Date.UTC(year, month - 1, day, hour, minute, second))
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Europe/Brussels',
+    timeZoneName: 'longOffset'
+  })
+  const parts = formatter.formatToParts(testUtc)
+  const tzPart = parts.find(p => p.type === 'timeZoneName')?.value
+  let offsetMinutes = 60
+  if (tzPart) {
+    const match = tzPart.match(/GMT([+-]\d+)(?::(\d+))?/)
+    if (match) {
+      const h = parseInt(match[1], 10)
+      const m = parseInt(match[2] || '0', 10)
+      offsetMinutes = h * 60 + (h >= 0 ? m : -m)
+    }
+  }
+  const utcMillis = Date.UTC(year, month - 1, day, hour, minute, second) - offsetMinutes * 60 * 1000
+  return new Date(utcMillis).toISOString()
+}
+
+export async function unlockDayForSchool(schoolId: string, date: string, durationMinutes: number) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user || !(await checkAdmin(supabase))) return { error: 'Geen toegang' }
+
+  // Haal de school op voor deadlines
+  const { data: school, error: schoolErr } = await supabase
+    .from('schools')
+    .select('id, name, order_deadline, student_order_deadline')
+    .eq('id', schoolId)
+    .single()
+
+  if (schoolErr || !school) return { error: 'School niet gevonden' }
+
+  const { todayStr } = getBrusselsNowAdmin()
+  let openUntilIso = ''
+
+  if (date > todayStr) {
+    // Toekomstige datum: sluiting op het standaard sluitingsuur op die dag
+    const deadline = school.student_order_deadline || school.order_deadline || '08:15:00'
+    openUntilIso = getBrusselsISOAdmin(date, deadline)
+  } else {
+    // Datum vandaag of in het verleden
+    if (durationMinutes === -1) {
+      // Tot einde van de huidige dag (23:59:59)
+      openUntilIso = getBrusselsISOAdmin(todayStr, '23:59:59')
+    } else {
+      const mins = durationMinutes > 0 ? durationMinutes : 30
+      openUntilIso = new Date(Date.now() + mins * 60 * 1000).toISOString()
+    }
+  }
+
+  const { error: upsertErr } = await supabase
+    .from('day_unlocks')
+    .upsert({
+      school_id: schoolId,
+      unlock_date: date,
+      open_until: openUntilIso,
+      unlocked_by: user.id
+    }, { onConflict: 'school_id,unlock_date' })
+
+  if (upsertErr) {
+    if (upsertErr.code === 'PGRST205' || upsertErr.message?.includes('day_unlocks')) {
+      return { error: 'Tabel day_unlocks ontbreekt nog in Supabase. Voer het SQL script supabase_phase17_day_unlocks.sql uit in de Supabase SQL Editor.' }
+    }
+    return { error: 'Fout bij opslaan openstelling: ' + upsertErr.message }
+  }
+
+  revalidatePath('/admin')
+  revalidatePath('/leerlingen')
+  revalidatePath('/mijn-maaltijden')
+  return { success: true, openUntil: openUntilIso }
+}
+
+export async function getActiveDayUnlocks(schoolId?: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user || !(await checkAdmin(supabase))) return { error: 'Geen toegang' }
+
+  const nowIso = new Date().toISOString()
+  let query = supabase
+    .from('day_unlocks')
+    .select(`
+      id,
+      school_id,
+      unlock_date,
+      open_until,
+      created_at,
+      schools ( id, name )
+    `)
+    .gt('open_until', nowIso)
+    .order('unlock_date', { ascending: true })
+
+  if (schoolId) {
+    query = query.eq('school_id', schoolId)
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    if (error.code === 'PGRST205' || error.message?.includes('day_unlocks')) {
+      return { unlocks: [] }
+    }
+    return { error: error.message }
+  }
+
+  return { unlocks: data || [] }
+}
+
+export async function removeDayUnlock(unlockId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user || !(await checkAdmin(supabase))) return { error: 'Geen toegang' }
+
+  const { error } = await supabase
+    .from('day_unlocks')
+    .delete()
+    .eq('id', unlockId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/admin')
+  revalidatePath('/leerlingen')
+  revalidatePath('/mijn-maaltijden')
+  return { success: true }
+}

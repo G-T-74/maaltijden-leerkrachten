@@ -89,7 +89,18 @@ export async function placeOrder(formData: FormData) {
     }
 
     if (!isAllowed) {
-      return { error: 'De besteldeadline voor deze datum is verstreken.' }
+      // Check of er een actieve openstelling is via day_unlocks
+      const { data: activeUnlock } = await supabase
+        .from('day_unlocks')
+        .select('id')
+        .eq('school_id', schoolId)
+        .eq('unlock_date', orderDate)
+        .gt('open_until', new Date().toISOString())
+        .maybeSingle()
+
+      if (!activeUnlock) {
+        return { error: 'De besteldeadline voor deze datum is verstreken.' }
+      }
     }
   }
 

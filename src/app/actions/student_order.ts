@@ -123,18 +123,28 @@ export async function getStudentOrderMatrix(classId: string, schoolId: string, c
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Niet ingelogd' }
 
-  // Check of de dag gelocked is of deadline verstreken
-  const [lockRes, schoolDeadline] = await Promise.all([
+  // Check of de dag gelocked is of deadline verstreken, of uitzonderlijk ontgrendeld
+  const nowIso = new Date().toISOString()
+  const [lockRes, schoolDeadline, unlockRes] = await Promise.all([
     supabase
       .from('day_locks')
       .select('lock_date')
       .eq('school_id', schoolId)
       .eq('lock_date', date)
       .single(),
-    getSchoolStudentDeadline(supabase, schoolId)
+    getSchoolStudentDeadline(supabase, schoolId),
+    supabase
+      .from('day_unlocks')
+      .select('id, open_until')
+      .eq('school_id', schoolId)
+      .eq('unlock_date', date)
+      .gt('open_until', nowIso)
+      .maybeSingle()
   ])
 
-  const isLocked = !!lockRes.data || isDeadlinePassedForDate(date, schoolDeadline)
+  const isUnlocked = !!unlockRes?.data
+  const unlockOpenUntil = unlockRes?.data?.open_until || null
+  const isLocked = !isUnlocked && (!!lockRes.data || isDeadlinePassedForDate(date, schoolDeadline))
 
   // Haal leerlingen op (niet verborgen)
   const { data: students, error: studErr } = await supabase
@@ -173,7 +183,9 @@ export async function getStudentOrderMatrix(classId: string, schoolId: string, c
     students: students || [], 
     meals: meals || [], 
     orders,
-    isLocked
+    isLocked,
+    isUnlocked,
+    unlockOpenUntil
   }
 }
 
@@ -320,20 +332,28 @@ export async function getStudentOrderMatrixWeekly(classId: string, schoolId: str
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Niet ingelogd' }
 
-  // Check welke dagen gelocked zijn of waarvan de deadline is verstreken
-  const [lockRes, schoolDeadline] = await Promise.all([
+  // Check welke dagen gelocked zijn of waarvan de deadline is verstreken, tenzij uitzonderlijk ontgrendeld
+  const nowIso = new Date().toISOString()
+  const [lockRes, schoolDeadline, unlockRes] = await Promise.all([
     supabase
       .from('day_locks')
       .select('lock_date')
       .eq('school_id', schoolId)
       .in('lock_date', dates),
-    getSchoolStudentDeadline(supabase, schoolId)
+    getSchoolStudentDeadline(supabase, schoolId),
+    supabase
+      .from('day_unlocks')
+      .select('unlock_date')
+      .eq('school_id', schoolId)
+      .in('unlock_date', dates)
+      .gt('open_until', nowIso)
   ])
 
-  const lockedDates = (lockRes.data || []).map((l: any) => l.lock_date)
+  const unlockedDates = (unlockRes?.data || []).map((u: any) => u.unlock_date)
+  const lockedDates = (lockRes.data || []).map((l: any) => l.lock_date).filter((d: string) => !unlockedDates.includes(d))
 
   for (const d of dates) {
-    if (!lockedDates.includes(d) && isDeadlinePassedForDate(d, schoolDeadline)) {
+    if (!unlockedDates.includes(d) && !lockedDates.includes(d) && isDeadlinePassedForDate(d, schoolDeadline)) {
       lockedDates.push(d)
     }
   }

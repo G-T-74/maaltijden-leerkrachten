@@ -15,6 +15,8 @@ export default function StudentOrdersDailyClient({ activeSchoolId }: { activeSch
   const [initialOrders, setInitialOrders] = useState<any[]>([])
   const [currentOrders, setCurrentOrders] = useState<Record<string, string>>({}) // student_id -> meal_id
   const [isLocked, setIsLocked] = useState(false)
+  const [isUnlocked, setIsUnlocked] = useState(false)
+  const [unlockOpenUntil, setUnlockOpenUntil] = useState<string | null>(null)
   
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{type: 'error'|'success', text: string} | null>(null)
@@ -62,6 +64,8 @@ export default function StudentOrdersDailyClient({ activeSchoolId }: { activeSch
       setStudents(res.students || [])
       setMeals(res.meals || [])
       setIsLocked(res.isLocked || false)
+      setIsUnlocked(res.isUnlocked || false)
+      setUnlockOpenUntil(res.unlockOpenUntil || null)
       setInitialOrders(res.orders || [])
       
       // Bouw state object voor snelle rendering en aanpassingen
@@ -74,14 +78,20 @@ export default function StudentOrdersDailyClient({ activeSchoolId }: { activeSch
     setLoading(false)
   }
 
-  const isWeekendOrWednesday = () => {
+  const isWeekend = () => {
     const d = new Date(date)
-    const day = d.getDay() // 0=Sun, 3=Wed, 6=Sat
-    return day === 0 || day === 3 || day === 6
+    const day = d.getDay() // 0=Sun, 6=Sat
+    return day === 0 || day === 6
+  }
+
+  const isWednesday = () => {
+    const d = new Date(date)
+    return d.getDay() === 3
   }
 
   const handleCheckboxChange = (studentId: string, mealId: string) => {
-    if (isLocked || isWeekendOrWednesday()) return
+    const disabled = isWeekend() || (!isUnlocked && (isLocked || isWednesday()))
+    if (disabled) return
 
     setCurrentOrders(prev => {
       const newState = { ...prev }
@@ -168,7 +178,7 @@ export default function StudentOrdersDailyClient({ activeSchoolId }: { activeSch
     )
   }
 
-  const disabled = isLocked || isWeekendOrWednesday()
+  const disabled = isWeekend() || (!isUnlocked && (isLocked || isWednesday()))
 
   // Check of er niet-opgeslagen wijzigingen zijn t.o.v. initialOrders
   const hasUnsavedChanges = (() => {
@@ -192,15 +202,27 @@ export default function StudentOrdersDailyClient({ activeSchoolId }: { activeSch
         </div>
       )}
 
-      {isWeekendOrWednesday() && (
+      {isWeekend() && (
         <div className={styles.alertWarning}>
-          Op woensdag, zaterdag en zondag kunnen er geen maaltijden besteld worden.
+          In het weekend kunnen er geen maaltijden besteld worden.
         </div>
       )}
 
-      {isLocked && (
+      {!isUnlocked && isWednesday() && (
+        <div className={styles.alertWarning}>
+          Op woensdag kunnen er standaard geen maaltijden besteld worden voor leerlingen.
+        </div>
+      )}
+
+      {!isUnlocked && isLocked && !isWednesday() && !isWeekend() && (
         <div className={styles.alertWarning}>
           Deze dag is reeds afgesloten door de beheerder of de besteldeadline voor leerlingen is verstreken. Je kan geen wijzigingen meer doorvoeren.
+        </div>
+      )}
+
+      {isUnlocked && (
+        <div className={styles.alertInfo}>
+          🔓 Deze dag is uitzonderlijk opengesteld door de beheerder{unlockOpenUntil ? ` tot ${new Date(unlockOpenUntil).toLocaleTimeString('nl-BE', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Brussels' })}` : ''}. Je kan nu bestellingen invoeren of aanpassen.
         </div>
       )}
 

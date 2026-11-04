@@ -93,6 +93,15 @@
   border-radius: var(--radius-md);
 }
 
+.alertInfo {
+  padding: 1rem;
+  background-color: rgba(59, 130, 246, 0.1);
+  border: 1px solid #3b82f6;
+  color: #1d4ed8;
+  border-radius: var(--radius-md);
+}
+
+
 .matrixCard {
   background-color: var(--surface);
   border: 1px solid var(--border);

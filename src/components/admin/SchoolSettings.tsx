@@ -9,7 +9,10 @@ import {
   resetSchoolYear,
   unlockDayForSchool,
   getActiveDayUnlocks,
-  removeDayUnlock
+  removeDayUnlock,
+  lockDaysRange,
+  getActiveDayLocks,
+  removeDayLock
 } from '@/app/actions/admin'
 import styles from './SchoolSettings.module.css'
 
@@ -81,6 +84,18 @@ export default function SchoolSettings() {
   const [removingUnlockId, setRemovingUnlockId] = useState<string | null>(null)
   const [unlockError, setUnlockError] = useState<string | null>(null)
   const [unlockSuccess, setUnlockSuccess] = useState<string | null>(null)
+
+  // Day locks (sluiten) state
+  const [activeLocks, setActiveLocks] = useState<any[]>([])
+  const [lockSchoolId, setLockSchoolId] = useState<string>('ALL')
+  const [lockStartDate, setLockStartDate] = useState<string>(getTodayBrussels())
+  const [lockEndDate, setLockEndDate] = useState<string>(getTodayBrussels())
+  const [lockReason, setLockReason] = useState<string>('')
+  const [showLockConfirmModal, setShowLockConfirmModal] = useState<boolean>(false)
+  const [isSubmittingLock, setIsSubmittingLock] = useState<boolean>(false)
+  const [removingLockKey, setRemovingLockKey] = useState<string | null>(null)
+  const [lockError, setLockError] = useState<string | null>(null)
+  const [lockSuccess, setLockSuccess] = useState<string | null>(null)
   
   // Controleer of we in de toegestane periode zitten (25 juni t.e.m. 15 juli)
   const now = new Date();
@@ -92,6 +107,13 @@ export default function SchoolSettings() {
     const res = await getActiveDayUnlocks()
     if (res.unlocks) {
       setActiveUnlocks(res.unlocks)
+    }
+  }
+
+  const loadLocks = async () => {
+    const res = await getActiveDayLocks()
+    if (res.locks) {
+      setActiveLocks(res.locks)
     }
   }
 
@@ -133,14 +155,17 @@ export default function SchoolSettings() {
     }
     loadData()
     loadUnlocks()
+    loadLocks()
   }, [])
 
   useEffect(() => {
     const interval = setInterval(() => {
       loadUnlocks()
+      loadLocks()
     }, 60000)
     return () => clearInterval(interval)
   }, [])
+
 
 
   const handleDeadlineChange = (schoolId: string, val: string) => {
@@ -280,6 +305,74 @@ export default function SchoolSettings() {
       setTimeout(() => setUnlockSuccess(null), 3000)
     }
     setRemovingUnlockId(null)
+  }
+
+  const getWeekDaysInRange = (startStr: string, endStr: string) => {
+    if (!startStr || !endStr || startStr > endStr) return 0
+    let count = 0
+    const start = new Date(startStr + 'T12:00:00')
+    const end = new Date(endStr + 'T12:00:00')
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const day = d.getDay()
+      if (day !== 0 && day !== 6) count++
+    }
+    return count
+  }
+
+  const handleOpenLockConfirm = () => {
+    if (!lockStartDate || !lockEndDate) {
+      setLockError('Selecteer een start- en einddatum.')
+      return
+    }
+    if (lockStartDate > lockEndDate) {
+      setLockError('Startdatum mag niet na de einddatum liggen.')
+      return
+    }
+    const count = getWeekDaysInRange(lockStartDate, lockEndDate)
+    if (count === 0) {
+      setLockError('De geselecteerde periode bevat geen weekdagen (maandag t.e.m. vrijdag).')
+      return
+    }
+    setLockError(null)
+    setShowLockConfirmModal(true)
+  }
+
+  const handleExecuteLock = async () => {
+    setIsSubmittingLock(true)
+    setLockError(null)
+    setLockSuccess(null)
+
+    const res = await lockDaysRange(lockSchoolId, lockStartDate, lockEndDate, lockReason)
+    if (res.error) {
+      setLockError(res.error)
+      setShowLockConfirmModal(false)
+    } else {
+      const schoolLabel = lockSchoolId === 'ALL' 
+        ? 'alle scholen' 
+        : (schools.find(s => s.id === lockSchoolId)?.name || 'de gekozen school')
+      setLockSuccess(`Succesvol ${res.count} dag(en) afgesloten voor ${schoolLabel}!`)
+      setShowLockConfirmModal(false)
+      loadLocks()
+      setTimeout(() => setLockSuccess(null), 5000)
+    }
+    setIsSubmittingLock(false)
+  }
+
+  const handleRemoveLock = async (schoolId: string, lockDate: string, schoolName: string) => {
+    if (!confirm(`Weet je zeker dat je de sluiting voor ${schoolName} op ${formatUnlockDate(lockDate)} wilt verwijderen (dag weer openstellen)?`)) {
+      return
+    }
+    const key = `${schoolId}_${lockDate}`
+    setRemovingLockKey(key)
+    const res = await removeDayLock(schoolId, lockDate)
+    if (res.error) {
+      setLockError(res.error)
+    } else {
+      setLockSuccess('Sluiting succesvol verwijderd.')
+      loadLocks()
+      setTimeout(() => setLockSuccess(null), 3000)
+    }
+    setRemovingLockKey(null)
   }
 
   if (loading) return <div>Laden...</div>
@@ -543,6 +636,207 @@ export default function SchoolSettings() {
                 disabled={isSubmittingUnlock}
               >
                 {isSubmittingUnlock ? 'Bezig met openstellen...' : 'Ja, Dag Openstellen'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🔒 DAGEN SLUITEN (VAKANTIES & VRIJE DAGEN) */}
+      <div className={styles.card}>
+        <div className={styles.cardTitle}>
+          <span>🔒</span>
+          <h3>Dagen Sluiten (Vakanties & Vrije Dagen)</h3>
+        </div>
+        <p className={styles.cardDescription}>
+          Sluit één of meerdere dagen af voor maaltijdbestellingen, bijvoorbeeld voor een vakantieperiode, pedagogische studiedag of feestdag.
+          Tijdens deze periode kunnen leerkrachten en leerlingen geen bestellingen plaatsen.
+        </p>
+
+        {lockError && (
+          <div style={{ color: 'var(--primary)', marginBottom: '1rem', padding: '0.75rem', background: 'rgba(243, 53, 75, 0.1)', borderRadius: '6px' }}>
+            {lockError}
+          </div>
+        )}
+        {lockSuccess && (
+          <div style={{ color: '#16a34a', marginBottom: '1rem', padding: '0.75rem', background: 'rgba(34, 197, 94, 0.1)', borderRadius: '6px' }}>
+            {lockSuccess}
+          </div>
+        )}
+
+        <div className={styles.formGrid}>
+          <div className={styles.formGroup}>
+            <label>School:</label>
+            <select 
+              className={styles.select}
+              value={lockSchoolId}
+              onChange={e => setLockSchoolId(e.target.value)}
+            >
+              <option value="ALL">🏫 Alle scholen</option>
+              {schools.map(s => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className={styles.formGroup}>
+            <label>Startdatum:</label>
+            <input 
+              type="date"
+              className={styles.dateInput}
+              value={lockStartDate}
+              onChange={e => {
+                const newStart = e.target.value
+                setLockStartDate(newStart)
+                if (newStart > lockEndDate) {
+                  setLockEndDate(newStart)
+                }
+              }}
+            />
+          </div>
+
+          <div className={styles.formGroup}>
+            <label>Einddatum:</label>
+            <input 
+              type="date"
+              className={styles.dateInput}
+              value={lockEndDate}
+              min={lockStartDate}
+              onChange={e => setLockEndDate(e.target.value)}
+            />
+          </div>
+
+          <div className={styles.formGroup} style={{ flex: 1.5 }}>
+            <label>Reden / Omschrijving (optioneel):</label>
+            <input 
+              type="text"
+              className={styles.dateInput}
+              placeholder="bv. Herfstvakantie, Pedagogische studiedag..."
+              value={lockReason}
+              onChange={e => setLockReason(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <button 
+              className={styles.btn}
+              onClick={handleOpenLockConfirm}
+              style={{ height: '42px', whiteSpace: 'nowrap', backgroundColor: '#e11d48' }}
+            >
+              {`Periode Sluiten (${getWeekDaysInRange(lockStartDate, lockEndDate)} d.)`}
+            </button>
+          </div>
+        </div>
+
+        {/* LIJST MET GESLOTEN DAGEN */}
+        <div className={styles.activeTableContainer}>
+          <div className={styles.activeTableTitle}>
+            <span>📅</span>
+            <span>Geplande en actieve sluitingen ({activeLocks.length})</span>
+          </div>
+
+          {activeLocks.length === 0 ? (
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontStyle: 'italic' }}>
+              Er zijn momenteel geen gesloten dagen geregistreerd.
+            </p>
+          ) : (
+            <div className={styles.tableContainer}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th>School</th>
+                    <th>Gesloten Datum</th>
+                    <th>Reden / Omschrijving</th>
+                    <th>Actie</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {activeLocks.map(l => {
+                    const key = `${l.school_id}_${l.lock_date}`
+                    return (
+                      <tr key={key}>
+                        <td style={{ fontWeight: 600 }}>{l.schools?.name || 'Onbekend'}</td>
+                        <td>{formatUnlockDate(l.lock_date)}</td>
+                        <td>
+                          {l.reason ? (
+                            <span style={{ color: 'var(--text-main)', fontWeight: 500 }}>
+                              {l.reason}
+                            </span>
+                          ) : (
+                            <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                              Geen reden opgegeven
+                            </span>
+                          )}
+                        </td>
+                        <td>
+                          <button 
+                            className={styles.btnDanger}
+                            onClick={() => handleRemoveLock(l.school_id, l.lock_date, l.schools?.name || 'School')}
+                            disabled={removingLockKey === key}
+                          >
+                            {removingLockKey === key ? 'Bezig...' : 'Weer openen'}
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* BEVESTIGINGSMODAL SLUITING */}
+      {showLockConfirmModal && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modal}>
+            <h3 className={styles.modalTitle} style={{ color: '#e11d48' }}>
+              Bevestig Sluiting van Dagen
+            </h3>
+            <div className={styles.modalBody}>
+              <p>Weet je zeker dat je bestellingen wilt uitschakelen voor de volgende periode?</p>
+              <div className={styles.modalDetails}>
+                <div>
+                  <span>School:</span>
+                  <span>{lockSchoolId === 'ALL' ? '🏫 Alle scholen' : schools.find(s => s.id === lockSchoolId)?.name}</span>
+                </div>
+                <div>
+                  <span>Periode:</span>
+                  <span>
+                    {lockStartDate === lockEndDate 
+                      ? formatUnlockDate(lockStartDate)
+                      : `${formatUnlockDate(lockStartDate)} t.e.m. ${formatUnlockDate(lockEndDate)}`}
+                  </span>
+                </div>
+                <div>
+                  <span>Aantal weekdagen:</span>
+                  <span>{getWeekDaysInRange(lockStartDate, lockEndDate)} dag(en)</span>
+                </div>
+                <div>
+                  <span>Reden:</span>
+                  <span>{lockReason.trim() || 'Geen reden opgegeven'}</span>
+                </div>
+              </div>
+              <p style={{ fontSize: '0.85rem' }}>
+                Tijdens deze dagen kunnen leerkrachten en leerlingen geen maaltijden bestellen.
+              </p>
+            </div>
+            <div className={styles.modalActions}>
+              <button 
+                className={styles.btnSecondary}
+                onClick={() => setShowLockConfirmModal(false)}
+                disabled={isSubmittingLock}
+              >
+                Annuleren
+              </button>
+              <button 
+                className={styles.btn}
+                onClick={handleExecuteLock}
+                disabled={isSubmittingLock}
+                style={{ backgroundColor: '#e11d48' }}
+              >
+                {isSubmittingLock ? 'Bezig met sluiten...' : 'Ja, Dagen Sluiten'}
               </button>
             </div>
           </div>

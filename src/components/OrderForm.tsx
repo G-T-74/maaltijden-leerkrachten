@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getMealsForSchool, placeOrder } from '@/app/actions/order'
+import { getMealsForSchool, placeOrder, checkDayLock } from '@/app/actions/order'
 import styles from './OrderForm.module.css'
 
 type School = {
@@ -31,6 +31,7 @@ export default function OrderForm({ activeSchool, preferredCategory }: OrderForm
   const [selectedCategory, setSelectedCategory] = useState<string>('')
   const [quantity, setQuantity] = useState<number>(1)
   const [orderDate, setOrderDate] = useState<string>('')
+  const [dayLockInfo, setDayLockInfo] = useState<{ isLocked: boolean, reason?: string | null } | null>(null)
   
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
@@ -78,6 +79,16 @@ export default function OrderForm({ activeSchool, preferredCategory }: OrderForm
   // Check of gekozen datum een weekend is
   const chosenDateObj = orderDate ? new Date(orderDate) : null
   const isWeekend = chosenDateObj ? (chosenDateObj.getDay() === 0 || chosenDateObj.getDay() === 6) : false
+
+  // Check of de gekozen datum gesloten is door beheerder
+  useEffect(() => {
+    async function verifyLock() {
+      if (!activeSchool?.id || !orderDate) return
+      const res = await checkDayLock(activeSchool.id, orderDate)
+      setDayLockInfo(res)
+    }
+    verifyLock()
+  }, [activeSchool?.id, orderDate])
 
   // Fetch meals when school changes
   useEffect(() => {
@@ -180,6 +191,11 @@ export default function OrderForm({ activeSchool, preferredCategory }: OrderForm
               Bestellen voor het weekend is niet mogelijk.
             </p>
           )}
+          {dayLockInfo?.isLocked && (
+            <div style={{ color: 'var(--primary)', backgroundColor: 'rgba(243, 53, 75, 0.1)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--primary)', marginTop: '0.75rem', fontSize: '0.9rem' }}>
+              ⚠️ Deze datum is afgesloten door de beheerder{dayLockInfo.reason ? ` wegens: ${dayLockInfo.reason}` : ''}. Je kunt voor deze dag geen bestelling plaatsen.
+            </div>
+          )}
         </div>
 
         {meals.length > 0 && (
@@ -253,7 +269,7 @@ export default function OrderForm({ activeSchool, preferredCategory }: OrderForm
         <button 
           type="submit" 
           className={styles.submitBtn}
-          disabled={loading || !selectedMealId || isWeekend}
+          disabled={loading || !selectedMealId || isWeekend || dayLockInfo?.isLocked}
         >
           {loading ? 'Bezig met bestellen...' : 'Bestelling Plaatsen'}
         </button>
@@ -261,3 +277,4 @@ export default function OrderForm({ activeSchool, preferredCategory }: OrderForm
     </div>
   )
 }
+

@@ -15,6 +15,8 @@ export default function StudentOrdersDailyClient({ activeSchoolId }: { activeSch
   const [initialOrders, setInitialOrders] = useState<any[]>([])
   const [currentOrders, setCurrentOrders] = useState<Record<string, string>>({}) // student_id -> meal_id
   const [isLocked, setIsLocked] = useState(false)
+  const [isDayLocked, setIsDayLocked] = useState(false)
+  const [lockReason, setLockReason] = useState<string | null>(null)
   const [isUnlocked, setIsUnlocked] = useState(false)
   const [unlockOpenUntil, setUnlockOpenUntil] = useState<string | null>(null)
   
@@ -64,6 +66,8 @@ export default function StudentOrdersDailyClient({ activeSchoolId }: { activeSch
       setStudents(res.students || [])
       setMeals(res.meals || [])
       setIsLocked(res.isLocked || false)
+      setIsDayLocked(res.isDayLocked || false)
+      setLockReason(res.lockReason || null)
       setIsUnlocked(res.isUnlocked || false)
       setUnlockOpenUntil(res.unlockOpenUntil || null)
       setInitialOrders(res.orders || [])
@@ -216,7 +220,10 @@ export default function StudentOrdersDailyClient({ activeSchoolId }: { activeSch
 
       {!isUnlocked && isLocked && !isWednesday() && !isWeekend() && (
         <div className={styles.alertWarning}>
-          Deze dag is reeds afgesloten door de beheerder of de besteldeadline voor leerlingen is verstreken. Je kan geen wijzigingen meer doorvoeren.
+          {isDayLocked 
+            ? `Deze dag is afgesloten door de beheerder${lockReason ? ` wegens: ${lockReason}` : ''}. Je kan geen wijzigingen meer doorvoeren.`
+            : 'Deze dag is reeds afgesloten door de beheerder of de besteldeadline voor leerlingen is verstreken. Je kan geen wijzigingen meer doorvoeren.'
+          }
         </div>
       )}
 

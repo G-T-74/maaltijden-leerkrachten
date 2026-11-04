@@ -774,3 +774,135 @@ export async function removeDayUnlock(unlockId: string) {
   revalidatePath('/mijn-maaltijden')
   return { success: true }
 }
+
+// --- DAGEN SLUITEN (DAY LOCKS / VAKANTIES) ---
+
+export async function lockDaysRange(schoolId: string, startDate: string, endDate: string, reason?: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user || !(await checkAdmin(supabase))) return { error: 'Geen toegang' }
+
+  if (!startDate || !endDate) {
+    return { error: 'Startdatum en einddatum zijn verplicht.' }
+  }
+
+  if (startDate > endDate) {
+    return { error: 'De startdatum mag niet na de einddatum liggen.' }
+  }
+
+  // Genereer alle weekdagen in de geselecteerde periode
+  const dates: string[] = []
+  const start = new Date(startDate + 'T12:00:00')
+  const end = new Date(endDate + 'T12:00:00')
+
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const day = d.getDay() // 0 = Sun, 6 = Sat
+    if (day !== 0 && day !== 6) {
+      dates.push(d.toISOString().split('T')[0])
+    }
+  }
+
+  if (dates.length === 0) {
+    return { error: 'De geselecteerde periode bevat geen weekdagen (ma-vr).' }
+  }
+
+  // Bepaal welke scholen gesloten moeten worden
+  let targetSchoolIds: string[] = []
+  if (schoolId === 'ALL') {
+    const { data: allSchools, error: sErr } = await supabase
+      .from('schools')
+      .select('id')
+    if (sErr || !allSchools) {
+      return { error: 'Fout bij ophalen scholen: ' + (sErr?.message || 'Onbekende fout') }
+    }
+    targetSchoolIds = allSchools.map(s => s.id)
+  } else {
+    targetSchoolIds = [schoolId]
+  }
+
+  const recordsToInsert = []
+  for (const sId of targetSchoolIds) {
+    for (const dateStr of dates) {
+      recordsToInsert.push({
+        school_id: sId,
+        lock_date: dateStr,
+        reason: reason?.trim() || null,
+        locked_by: user.id
+      })
+    }
+  }
+
+  const { error: upsertErr } = await supabase
+    .from('day_locks')
+    .upsert(recordsToInsert, { onConflict: 'school_id,lock_date' })
+
+  if (upsertErr) {
+    if (upsertErr.code === 'PGRST205' || upsertErr.message?.includes('day_locks')) {
+      return { error: 'Tabel day_locks ontbreekt nog in Supabase. Voer het SQL script supabase_phase18_day_locks.sql uit in de Supabase SQL Editor.' }
+    }
+    return { error: 'Fout bij opslaan sluitingen: ' + upsertErr.message }
+  }
+
+  revalidatePath('/admin')
+  revalidatePath('/leerlingen')
+  revalidatePath('/mijn-maaltijden')
+  return { success: true, count: recordsToInsert.length }
+}
+
+export async function getActiveDayLocks(schoolId?: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user || !(await checkAdmin(supabase))) return { error: 'Geen toegang' }
+
+  const recentPast = new Date()
+  recentPast.setDate(recentPast.getDate() - 7)
+  const recentPastStr = recentPast.toISOString().split('T')[0]
+
+  let query = supabase
+    .from('day_locks')
+    .select(`
+      id,
+      school_id,
+      lock_date,
+      reason,
+      locked_at,
+      schools ( id, name )
+    `)
+    .gte('lock_date', recentPastStr)
+    .order('lock_date', { ascending: true })
+
+  if (schoolId && schoolId !== 'ALL') {
+    query = query.eq('school_id', schoolId)
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    if (error.code === 'PGRST205' || error.message?.includes('day_locks')) {
+      return { locks: [] }
+    }
+    return { error: error.message }
+  }
+
+  return { locks: data || [] }
+}
+
+export async function removeDayLock(schoolId: string, lockDate: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user || !(await checkAdmin(supabase))) return { error: 'Geen toegang' }
+
+  const { error } = await supabase
+    .from('day_locks')
+    .delete()
+    .eq('school_id', schoolId)
+    .eq('lock_date', lockDate)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/admin')
+  revalidatePath('/leerlingen')
+  revalidatePath('/mijn-maaltijden')
+  return { success: true }
+}
+

@@ -128,10 +128,10 @@ export async function getStudentOrderMatrix(classId: string, schoolId: string, c
   const [lockRes, schoolDeadline, unlockRes] = await Promise.all([
     supabase
       .from('day_locks')
-      .select('lock_date')
+      .select('lock_date, reason')
       .eq('school_id', schoolId)
       .eq('lock_date', date)
-      .single(),
+      .maybeSingle(),
     getSchoolStudentDeadline(supabase, schoolId),
     supabase
       .from('day_unlocks')
@@ -144,7 +144,10 @@ export async function getStudentOrderMatrix(classId: string, schoolId: string, c
 
   const isUnlocked = !!unlockRes?.data
   const unlockOpenUntil = unlockRes?.data?.open_until || null
-  const isLocked = !isUnlocked && (!!lockRes.data || isDeadlinePassedForDate(date, schoolDeadline))
+  const isDayLocked = !!lockRes?.data
+  const lockReason = lockRes?.data?.reason || null
+  const isDeadlinePassed = isDeadlinePassedForDate(date, schoolDeadline)
+  const isLocked = !isUnlocked && (isDayLocked || isDeadlinePassed)
 
   // Haal leerlingen op (niet verborgen)
   const { data: students, error: studErr } = await supabase
@@ -184,6 +187,8 @@ export async function getStudentOrderMatrix(classId: string, schoolId: string, c
     meals: meals || [], 
     orders,
     isLocked,
+    isDayLocked,
+    lockReason,
     isUnlocked,
     unlockOpenUntil
   }

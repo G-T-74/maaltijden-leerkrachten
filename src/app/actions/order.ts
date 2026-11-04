@@ -99,6 +99,18 @@ export async function placeOrder(formData: FormData) {
         .maybeSingle()
 
       if (!activeUnlock) {
+        // Check of de dag gesloten is door de beheerder
+        const { data: dayLock } = await supabase
+          .from('day_locks')
+          .select('reason')
+          .eq('school_id', schoolId)
+          .eq('lock_date', orderDate)
+          .maybeSingle()
+
+        if (dayLock) {
+          return { error: `Deze datum is afgesloten door de beheerder${dayLock.reason ? ` (Reden: ${dayLock.reason})` : ''}.` }
+        }
+
         return { error: 'De besteldeadline voor deze datum is verstreken.' }
       }
     }
@@ -253,3 +265,36 @@ export async function updateOrder(formData: FormData) {
   revalidatePath('/')
   return { success: true }
 }
+
+export async function checkDayLock(schoolId: string, date: string) {
+  const supabase = await createClient()
+
+  // Controleer eerst of er een uitzonderlijke actieve openstelling is
+  const nowIso = new Date().toISOString()
+  const { data: activeUnlock } = await supabase
+    .from('day_unlocks')
+    .select('id, open_until')
+    .eq('school_id', schoolId)
+    .eq('unlock_date', date)
+    .gt('open_until', nowIso)
+    .maybeSingle()
+
+  if (activeUnlock) {
+    return { isLocked: false, isUnlocked: true, openUntil: activeUnlock.open_until }
+  }
+
+  // Controleer of de dag gesloten is in day_locks
+  const { data: lock } = await supabase
+    .from('day_locks')
+    .select('reason')
+    .eq('school_id', schoolId)
+    .eq('lock_date', date)
+    .maybeSingle()
+
+  if (lock) {
+    return { isLocked: true, reason: lock.reason || null }
+  }
+
+  return { isLocked: false }
+}
+

@@ -354,7 +354,7 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
                             type="number" 
                             step="0.1" 
                             value={editForm.price ?? ''} 
-                            onChange={e => setEditForm({ ...editForm, price: e.target.value })}
+                            onChange={e => setEditForm({ ...editForm, price: parseFloat(e.target.value) || 0 })}
                             className={styles.input}
                             style={{ width: '80px' }}
                           />
@@ -366,7 +366,7 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
                               type="number" 
                               step="0.1" 
                               value={editForm.price_kleuter ?? ''} 
-                              onChange={e => setEditForm({ ...editForm, price_kleuter: e.target.value })}
+                              onChange={e => setEditForm({ ...editForm, price_kleuter: parseFloat(e.target.value) || 0 })}
                               className={styles.input}
                               style={{ width: '80px' }}
                             />
@@ -376,7 +376,7 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
                               type="number" 
                               step="0.1" 
                               value={editForm.price_lager ?? ''} 
-                              onChange={e => setEditForm({ ...editForm, price_lager: e.target.value })}
+                              onChange={e => setEditForm({ ...editForm, price_lager: parseFloat(e.target.value) || 0 })}
                               className={styles.input}
                               style={{ width: '80px' }}
                             />

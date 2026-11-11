@@ -906,3 +906,146 @@ export async function removeDayLock(schoolId: string, lockDate: string) {
   return { success: true }
 }
 
+// --- OVERZICHT LEERLINGENMAALTIJDEN PER SOORT PER KLAS (DAGOVERZICHT) ---
+
+export async function getDailyStudentOrdersSummary(schoolId: string, catererId: string, date: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user || !(await checkAdmin(supabase))) return { error: 'Geen toegang' }
+
+  // 1. Haal klassen op voor deze school
+  const { data: classes, error: classErr } = await supabase
+    .from('classes')
+    .select('id, name, level')
+    .eq('school_id', schoolId)
+    .order('name')
+
+  if (classErr) {
+    console.error('Classes error:', classErr)
+    return { error: 'Fout bij ophalen klassen: ' + classErr.message }
+  }
+
+  // 2. Haal actieve student meals op voor deze caterer
+  const { data: meals, error: mealErr } = await supabase
+    .from('student_meals')
+    .select('id, name, price_kleuter, price_lager')
+    .eq('caterer_id', catererId)
+    .eq('is_active', true)
+    .order('name')
+
+  if (mealErr) {
+    console.error('Meals error:', mealErr)
+    return { error: 'Fout bij ophalen maaltijden: ' + mealErr.message }
+  }
+
+  const classList = classes || []
+  const mealList = meals || []
+  const classIds = classList.map(c => c.id)
+
+  if (classList.length === 0 || mealList.length === 0) {
+    return {
+      classes: classList,
+      meals: mealList,
+      matrix: {},
+      classTotals: {},
+      mealTotals: {},
+      grandTotal: 0,
+      studentDetailsByClass: {}
+    }
+  }
+
+  // 3. Haal studenten op van deze klassen
+  const { data: students, error: studErr } = await supabase
+    .from('students')
+    .select('id, class_id, first_name, class_number')
+    .in('class_id', classIds)
+    .eq('is_hidden', false)
+    .order('class_number')
+
+  if (studErr) {
+    console.error('Students error:', studErr)
+    return { error: 'Fout bij ophalen leerlingen: ' + studErr.message }
+  }
+
+  const studentList = students || []
+  const studentIds = studentList.map(s => s.id)
+
+  const studentMap: Record<string, any> = {}
+  studentList.forEach(s => {
+    studentMap[s.id] = s
+  })
+
+  // 4. Haal bestellingen op voor deze datum
+  let studentOrders: any[] = []
+  if (studentIds.length > 0) {
+    const { data: orders, error: orderErr } = await supabase
+      .from('student_orders')
+      .select('id, student_id, student_meal_id, quantity')
+      .in('student_id', studentIds)
+      .eq('order_date', date)
+
+    if (orderErr) {
+      console.error('Student orders error:', orderErr)
+      return { error: 'Fout bij ophalen bestellingen: ' + orderErr.message }
+    }
+    studentOrders = orders || []
+  }
+
+  // 5. Bouw matrix en totalen
+  const matrix: Record<string, Record<string, number>> = {}
+  const classTotals: Record<string, number> = {}
+  const mealTotals: Record<string, number> = {}
+  const studentDetailsByClass: Record<string, { studentName: string, classNumber: number, mealName: string, quantity: number }[]> = {}
+  let grandTotal = 0
+
+  classList.forEach(c => {
+    matrix[c.id] = {}
+    classTotals[c.id] = 0
+    studentDetailsByClass[c.id] = []
+    mealList.forEach(m => {
+      matrix[c.id][m.id] = 0
+    })
+  })
+
+  mealList.forEach(m => {
+    mealTotals[m.id] = 0
+  })
+
+  studentOrders.forEach(o => {
+    const student = studentMap[o.student_id]
+    if (!student) return
+    const classId = student.class_id
+    const mealId = o.student_meal_id
+    const qty = o.quantity || 1
+
+    if (matrix[classId] && matrix[classId][mealId] !== undefined) {
+      matrix[classId][mealId] += qty
+      classTotals[classId] += qty
+      mealTotals[mealId] = (mealTotals[mealId] || 0) + qty
+      grandTotal += qty
+
+      const mealObj = mealList.find(m => m.id === mealId)
+      studentDetailsByClass[classId].push({
+        studentName: student.first_name,
+        classNumber: student.class_number,
+        mealName: mealObj?.name || 'Onbekend',
+        quantity: qty
+      })
+    }
+  })
+
+  Object.keys(studentDetailsByClass).forEach(cId => {
+    studentDetailsByClass[cId].sort((a, b) => a.classNumber - b.classNumber)
+  })
+
+  return {
+    classes: classList,
+    meals: mealList,
+    matrix,
+    classTotals,
+    mealTotals,
+    grandTotal,
+    studentDetailsByClass
+  }
+}
+

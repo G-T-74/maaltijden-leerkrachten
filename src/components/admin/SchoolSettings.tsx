@@ -112,7 +112,9 @@ export default function SchoolSettings() {
 
   const loadLocks = async () => {
     const res = await getActiveDayLocks()
-    if (res.locks) {
+    if (res.error) {
+      setLockError(res.error)
+    } else if (res.locks) {
       setActiveLocks(res.locks)
     }
   }
@@ -147,8 +149,9 @@ export default function SchoolSettings() {
         setStudentDeadlines(initialStudentDeadlines)
         setToddlerFactors(initialFactors)
 
-        if (res.schools.length > 0) {
-          setUnlockSchoolId(prev => prev || res.schools[0].id)
+        if (res.schools && res.schools.length > 0) {
+          const firstSchoolId = res.schools[0].id
+          setUnlockSchoolId(prev => prev || firstSchoolId)
         }
       }
       setLoading(false)

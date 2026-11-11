@@ -861,7 +861,6 @@ export async function getActiveDayLocks(schoolId?: string) {
   let query = supabase
     .from('day_locks')
     .select(`
-      id,
       school_id,
       lock_date,
       reason,
@@ -878,10 +877,11 @@ export async function getActiveDayLocks(schoolId?: string) {
   const { data, error } = await query
 
   if (error) {
-    if (error.code === 'PGRST205' || error.message?.includes('day_locks')) {
+    console.error('Error fetching day_locks:', error)
+    if (error.code === 'PGRST205') {
       return { locks: [] }
     }
-    return { error: error.message }
+    return { error: error.message, locks: [] }
   }
 
   return { locks: data || [] }

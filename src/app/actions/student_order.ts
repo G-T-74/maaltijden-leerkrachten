@@ -240,6 +240,84 @@ export async function saveStudentOrdersBulk(classId: string, date: string, toIns
   return { success: true }
 }
 
+// 6. Haal bestellingen op van de meest recente eerdere dag waarop er bestellingen waren
+export async function getLastFilledStudentOrdersForClass(classId: string, catererId?: string, beforeDate?: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Niet ingelogd' }
+
+  // Haal studenten op van deze klas
+  const { data: students, error: studErr } = await supabase
+    .from('students')
+    .select('id')
+    .eq('class_id', classId)
+    .eq('is_hidden', false)
+
+  if (studErr || !students || students.length === 0) {
+    return { error: 'Geen leerlingen gevonden in deze klas' }
+  }
+
+  const studentIds = students.map(s => s.id)
+
+  // Zoek de meest recente datum waarop er bestellingen waren voor deze klas
+  let query = supabase
+    .from('student_orders')
+    .select('order_date')
+    .in('student_id', studentIds)
+    .order('order_date', { ascending: false })
+
+  if (beforeDate) {
+    query = query.lt('order_date', beforeDate)
+  }
+
+  const { data: lastOrderDateData, error: dateErr } = await query.limit(1)
+
+  if (dateErr || !lastOrderDateData || lastOrderDateData.length === 0) {
+    return { error: 'Geen eerdere bestellingen gevonden om over te nemen.' }
+  }
+
+  const lastDate = lastOrderDateData[0].order_date
+
+  // Haal bestellingen op voor die datum
+  const { data: orders, error: ordersErr } = await supabase
+    .from('student_orders')
+    .select('student_id, student_meal_id')
+    .in('student_id', studentIds)
+    .eq('order_date', lastDate)
+
+  if (ordersErr || !orders || orders.length === 0) {
+    return { error: `Geen bestellingen gevonden op ${lastDate}.` }
+  }
+
+  // Als catererId is meegegeven, controleer welke maaltijden nog actief zijn
+  let activeMealSet: Set<string> | null = null
+  if (catererId) {
+    const mealIds = [...new Set(orders.map(o => o.student_meal_id))]
+    const { data: activeMeals } = await supabase
+      .from('student_meals')
+      .select('id')
+      .in('id', mealIds)
+      .eq('caterer_id', catererId)
+      .eq('is_active', true)
+
+    if (activeMeals) {
+      activeMealSet = new Set(activeMeals.map(m => m.id))
+    }
+  }
+
+  const orderMap: Record<string, string> = {}
+  orders.forEach(o => {
+    if (!activeMealSet || activeMealSet.has(o.student_meal_id)) {
+      orderMap[o.student_id] = o.student_meal_id
+    }
+  })
+
+  return {
+    date: lastDate,
+    orders: orderMap
+  }
+}
+
 // 4. Vorige week kopiëren
 export async function copyPreviousStudentOrders(classId: string, targetDate: string) {
   const supabase = await createClient()

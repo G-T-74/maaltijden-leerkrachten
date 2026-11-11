@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getTeacherClasses, getStudentOrderMatrixWeekly, saveStudentOrdersBulkWeekly } from '@/app/actions/student_order'
+import { getTeacherClasses, getStudentOrderMatrixWeekly, saveStudentOrdersBulkWeekly, getLastFilledStudentOrdersForClass } from '@/app/actions/student_order'
 import styles from './StudentOrdersClient.module.css'
 
 function getMonday(d: Date) {
@@ -137,27 +137,102 @@ export default function StudentOrdersWeeklyClient({ activeSchoolId }: { activeSc
     }))
   }
 
-  const handleCopyMonday = () => {
-    if (weekDates.length === 0) return
-    const monday = weekDates[0]
-    
+  const handleFillFromLastFilledDay = async () => {
+    if (weekDates.length === 0 || !activeClassId || students.length === 0) return
+
+    // 1. Zoek eerst of er in de huidige week al dagen zijn ingevuld in currentOrders
+    let sourceDate: string | null = null
+    const reversedDates = [...weekDates].reverse()
+    for (const d of reversedDates) {
+      if (students.some(s => currentOrders[s.id]?.[d])) {
+        sourceDate = d
+        break
+      }
+    }
+
+    let sourceOrders: Record<string, string> = {}
+
+    if (sourceDate) {
+      // Gebruik de laatst ingevulde dag binnen de huidige weergave
+      students.forEach(s => {
+        sourceOrders[s.id] = currentOrders[s.id]?.[sourceDate!] || ''
+      })
+    } else {
+      // 2. Als er in de huidige week nog niets is ingevuld, haal de laatste dag op uit de database
+      setSaving(true)
+      const selectedClass = classes.find(c => c.id === activeClassId)
+      const catererId = selectedClass?.schools?.caterer_id
+      const res = await getLastFilledStudentOrdersForClass(activeClassId, catererId, weekDates[0])
+      setSaving(false)
+
+      if (res.error) {
+        setMessage({ type: 'error', text: res.error })
+        return
+      }
+
+      sourceDate = res.date
+      sourceOrders = res.orders || {}
+    }
+
+    if (!sourceDate) {
+      setMessage({ type: 'error', text: 'Geen eerdere bestellingen gevonden om over te nemen.' })
+      return
+    }
+
+    // Vul alle openstaande/ontgrendelde dagen van de week in met deze keuzes
     setCurrentOrders(prev => {
       const next = { ...prev }
       students.forEach(student => {
-        const mondayChoice = next[student.id][monday]
+        const choice = sourceOrders[student.id] || ''
         weekDates.forEach(date => {
           if (!lockedDates.includes(date)) {
+            if (!next[student.id]) next[student.id] = {}
             next[student.id] = {
               ...next[student.id],
-              [date]: mondayChoice
+              [date]: choice
             }
           }
         })
       })
       return next
     })
-    
-    setMessage({ type: 'success', text: 'Maandag succesvol gekopieerd naar de rest van de week!' })
+
+    setMessage({ 
+      type: 'success', 
+      text: `Week ingevuld a.d.h.v. ${formatDateDisplay(sourceDate)}. Bevestig door op "Wijzigingen opslaan" te klikken.` 
+    })
+  }
+
+  const handleFillAllWarm = () => {
+    if (weekDates.length === 0 || students.length === 0) return
+
+    // Zoek warme maaltijd (bijv. maaltijd met "warm" in de naam)
+    const warmMeal = meals.find(m => m.name.toLowerCase().includes('warm')) || meals[0]
+    if (!warmMeal) {
+      setMessage({ type: 'error', text: 'Geen maaltijden gevonden om in te vullen.' })
+      return
+    }
+
+    setCurrentOrders(prev => {
+      const next = { ...prev }
+      students.forEach(student => {
+        weekDates.forEach(date => {
+          if (!lockedDates.includes(date)) {
+            if (!next[student.id]) next[student.id] = {}
+            next[student.id] = {
+              ...next[student.id],
+              [date]: warmMeal.id
+            }
+          }
+        })
+      })
+      return next
+    })
+
+    setMessage({ 
+      type: 'success', 
+      text: `Hele week warm ("${warmMeal.name}") ingevuld voor alle leerlingen. Bevestig door op "Wijzigingen opslaan" te klikken.` 
+    })
   }
 
   const handleSave = async () => {
@@ -272,21 +347,33 @@ export default function StudentOrdersWeeklyClient({ activeSchoolId }: { activeSc
               />
             </div>
           </div>
-          <div className={styles.headerActions} style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <div className={styles.headerActions} style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center' }}>
             <button 
-              onClick={handleCopyMonday} 
+              type="button"
+              onClick={handleFillFromLastFilledDay} 
               disabled={saving}
               className={`${styles.btn} ${styles.btnSecondary}`}
+              title="Vul alle openstaande dagen van deze week in a.d.h.v. de laatst ingevulde dag"
             >
-              ⟲ Vul rest vd week a.d.h.v. maandag
+              ⟲ Week invullen a.d.h.v. laatst ingevulde dag
             </button>
             <button 
+              type="button"
+              onClick={handleFillAllWarm} 
+              disabled={saving}
+              className={`${styles.btn} ${styles.btnSecondary}`}
+              title="Vul alle openstaande dagen voor alle leerlingen in met warme maaltijd"
+            >
+              🍲 Hele week warm invullen
+            </button>
+            <button 
+              type="button"
               onClick={handleSave} 
               disabled={saving}
               className={`${styles.btn} ${styles.btnPrimary}`}
               style={isAllSaved ? { backgroundColor: '#2e7d32', borderColor: '#1b5e20', color: 'white' } : {}}
             >
-              {saving ? 'Opslaan...' : (isAllSaved ? '💾 Bestellingen Opgeslagen' : (hasAnySavedOrders ? '💾 Wijzigingen Opslaan' : '💾 Bestellingen Opslaan'))}
+              {saving ? 'Opslaan...' : (isAllSaved ? '💾 Bestellingen Opgeslagen' : '💾 Wijzigingen Opslaan')}
             </button>
           </div>
         </div>

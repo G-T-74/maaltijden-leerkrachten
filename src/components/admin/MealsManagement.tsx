@@ -1,7 +1,16 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getAdminMeals, getAdminStudentMeals, getCaterers, saveMeal, deleteMeal, saveStudentMeal, deleteStudentMeal } from '@/app/actions/admin'
+import { 
+  getAdminMeals, 
+  getAdminStudentMeals, 
+  getCaterers, 
+  saveMeal, 
+  deleteMeal, 
+  saveStudentMeal, 
+  deleteStudentMeal,
+  updateMealsOrder 
+} from '@/app/actions/admin'
 import styles from './MealsManagement.module.css'
 
 type Meal = {
@@ -13,6 +22,7 @@ type Meal = {
   price_lager?: number
   is_active: boolean
   caterer_id: string
+  sort_order?: number
   caterers?: { name: string }
 }
 
@@ -28,6 +38,12 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'teacher' | 'student'>('teacher')
   
+  // Drag & drop state
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+  const [reordering, setReordering] = useState(false)
+  const [reorderSuccess, setReorderSuccess] = useState(false)
+
   // Top form state (Nieuwe Maaltijd)
   const [newName, setNewName] = useState('')
   const [newCategory, setNewCategory] = useState('')
@@ -169,12 +185,86 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
     setSavingEdit(false)
   }
 
+  // Drag & drop handlers
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    if (editId) return
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', index.toString())
+    setDraggedIndex(index)
+  }
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault()
+    if (draggedIndex === null || draggedIndex === index) return
+    setDragOverIndex(index)
+  }
+
+  const handleDragLeave = () => {
+    // optioneel
+  }
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null)
+    setDragOverIndex(null)
+  }
+
+  const handleDrop = async (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault()
+    if (draggedIndex === null || draggedIndex === dropIndex) {
+      setDraggedIndex(null)
+      setDragOverIndex(null)
+      return
+    }
+
+    const updated = [...meals]
+    const [moved] = updated.splice(draggedIndex, 1)
+    updated.splice(dropIndex, 0, moved)
+
+    setMeals(updated)
+    setDraggedIndex(null)
+    setDragOverIndex(null)
+
+    setReordering(true)
+    const res = await updateMealsOrder(updated.map(m => m.id), activeTab)
+    setReordering(false)
+
+    if (res.error) {
+      setError(res.error)
+      loadData() // Herstel oude volgorde bij fout
+    } else {
+      setReorderSuccess(true)
+      setTimeout(() => setReorderSuccess(false), 2500)
+    }
+  }
+
+  const handleMove = async (fromIndex: number, toIndex: number) => {
+    if (toIndex < 0 || toIndex >= meals.length || editId) return
+
+    const updated = [...meals]
+    const [moved] = updated.splice(fromIndex, 1)
+    updated.splice(toIndex, 0, moved)
+
+    setMeals(updated)
+
+    setReordering(true)
+    const res = await updateMealsOrder(updated.map(m => m.id), activeTab)
+    setReordering(false)
+
+    if (res.error) {
+      setError(res.error)
+      loadData()
+    } else {
+      setReorderSuccess(true)
+      setTimeout(() => setReorderSuccess(false), 2500)
+    }
+  }
+
   if (loading && meals.length === 0) return <div>Laden...</div>
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-        <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--text-main)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+        <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--text-main)', margin: 0 }}>
           Maaltijden Beheer
         </h2>
         
@@ -300,10 +390,23 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
         </form>
       </div>
 
+      {/* Tip voor volgorde aanpassen */}
+      <div className={styles.orderTip}>
+        <div>
+          💡 <strong>Tip:</strong> Sleep de maaltijden via het handvat (<strong>⋮⋮</strong>) of gebruik de pijltjes (<strong>▲▼</strong>) om de volgorde te wijzigen. Deze volgorde wordt automatisch gebruikt bij bestellingen per dag of week.
+        </div>
+        {reorderSuccess && (
+          <div className={styles.reorderToast}>
+            ✓ Volgorde opgeslagen
+          </div>
+        )}
+      </div>
+
       <div className={styles.tableContainer}>
         <table className={styles.table}>
           <thead>
             <tr>
+              <th className={styles.dragCell}>Volgorde</th>
               <th>Naam</th>
               {activeTab === 'teacher' && <th>Categorie</th>}
               {activeTab === 'teacher' ? (
@@ -320,11 +423,62 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
             </tr>
           </thead>
           <tbody>
-            {meals.map(meal => {
+            {meals.map((meal, index) => {
               const isEditing = editId === meal.id
+              const isBeingDragged = draggedIndex === index
+              const isDragTarget = dragOverIndex === index
 
               return (
-                <tr key={meal.id} style={{ opacity: (!isEditing && !meal.is_active) ? 0.6 : 1, backgroundColor: isEditing ? 'var(--surface-hover)' : 'transparent' }}>
+                <tr 
+                  key={meal.id} 
+                  draggable={!editId}
+                  onDragStart={(e) => handleDragStart(e, index)}
+                  onDragOver={(e) => handleDragOver(e, index)}
+                  onDragLeave={handleDragLeave}
+                  onDrop={(e) => handleDrop(e, index)}
+                  onDragEnd={handleDragEnd}
+                  style={{ 
+                    opacity: isBeingDragged ? 0.35 : ((!isEditing && !meal.is_active) ? 0.6 : 1), 
+                    backgroundColor: isDragTarget ? 'rgba(59, 130, 246, 0.12)' : (isEditing ? 'var(--surface-hover)' : 'transparent'),
+                    borderTop: isDragTarget ? '2px solid var(--primary)' : undefined,
+                    transition: 'background-color 0.15s ease'
+                  }}
+                >
+                  <td className={styles.dragCell}>
+                    {!isEditing ? (
+                      <div className={styles.dragHandleBox}>
+                        <span 
+                          className={styles.dragHandle} 
+                          title="Sleep om volgorde te wijzigen"
+                        >
+                          ⋮⋮
+                        </span>
+                        <div className={styles.arrowGroup}>
+                          <button
+                            type="button"
+                            disabled={index === 0 || reordering}
+                            onClick={() => handleMove(index, index - 1)}
+                            className={styles.arrowBtn}
+                            title="Omhoog verplaatsen"
+                          >
+                            ▲
+                          </button>
+                          <button
+                            type="button"
+                            disabled={index === meals.length - 1 || reordering}
+                            onClick={() => handleMove(index, index + 1)}
+                            className={styles.arrowBtn}
+                            title="Omlaag verplaatsen"
+                          >
+                            ▼
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <span style={{ color: 'var(--text-muted)' }}>-</span>
+                    )}
+                  </td>
+
                   {isEditing ? (
                     // EDIT MODE
                     <>

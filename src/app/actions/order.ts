@@ -17,14 +17,26 @@ export async function getMealsForSchool(schoolId: string) {
     return { error: 'Geen traiteur gevonden voor deze school.', meals: [], school }
   }
 
-  // Haal actieve maaltijden op voor deze caterer
-  const { data: meals } = await supabase
+  // Haal actieve maaltijden op voor deze caterer (gesorteerd op sort_order)
+  let { data: meals, error: mealErr } = await supabase
     .from('meals')
     .select('*')
     .eq('caterer_id', school.caterer_id)
     .eq('is_active', true)
+    .order('sort_order', { ascending: true })
     .order('category')
     .order('name')
+
+  if (mealErr && (mealErr.code === '42703' || mealErr.message?.includes('sort_order'))) {
+    const fallback = await supabase
+      .from('meals')
+      .select('*')
+      .eq('caterer_id', school.caterer_id)
+      .eq('is_active', true)
+      .order('category')
+      .order('name')
+    meals = fallback.data
+  }
 
   return { meals: meals || [], school }
 }

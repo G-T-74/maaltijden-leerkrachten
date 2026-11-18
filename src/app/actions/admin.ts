@@ -173,12 +173,26 @@ export async function getAdminMeals(catererId: string | null) {
   const catererIds = userSchools?.map(us => (us.schools as any)?.caterer_id).filter(Boolean) || []
   if (!catererIds.includes(catererId)) return { error: 'Geen toegang tot deze traiteur.' }
 
-  const { data, error } = await supabase
+  // Probeer eerst te sorteren op sort_order
+  let { data, error } = await supabase
     .from('meals')
-    .select('id, name, category, price, is_active, caterer_id, caterers(name)')
+    .select('id, name, category, price, is_active, caterer_id, sort_order, caterers(name)')
     .eq('caterer_id', catererId)
+    .order('sort_order', { ascending: true })
     .order('category')
     .order('name')
+
+  // Fallback als sort_order kolom nog niet gemigreerd is in Supabase
+  if (error && (error.code === '42703' || error.message?.includes('sort_order'))) {
+    const fallback = await supabase
+      .from('meals')
+      .select('id, name, category, price, is_active, caterer_id, caterers(name)')
+      .eq('caterer_id', catererId)
+      .order('category')
+      .order('name')
+    if (fallback.error) return { error: fallback.error.message }
+    return { meals: fallback.data }
+  }
 
   if (error) return { error: error.message }
   return { meals: data }
@@ -208,12 +222,29 @@ export async function saveMeal(formData: FormData) {
       
     if (error) return { error: error.message }
   } else {
-    // Create new
-    const { error } = await supabase
+    // Bepaal de volgende sort_order
+    let sort_order = 1
+    const { data: maxMeal } = await supabase
       .from('meals')
-      .insert({ name, category, price, caterer_id, is_active })
+      .select('sort_order')
+      .eq('caterer_id', caterer_id)
+      .order('sort_order', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (maxMeal?.sort_order) sort_order = maxMeal.sort_order + 1
+
+    let { error } = await supabase
+      .from('meals')
+      .insert({ name, category, price, caterer_id, is_active, sort_order })
       
-    if (error) return { error: error.message }
+    if (error && (error.code === '42703' || error.message?.includes('sort_order'))) {
+      const fb = await supabase
+        .from('meals')
+        .insert({ name, category, price, caterer_id, is_active })
+      if (fb.error) return { error: fb.error.message }
+    } else if (error) {
+      return { error: error.message }
+    }
   }
 
   revalidatePath('/admin')
@@ -244,11 +275,24 @@ export async function getAdminStudentMeals(catererId: string | null) {
 
   if (!catererId) return { meals: [] }
 
-  const { data, error } = await supabase
+  // Probeer eerst te sorteren op sort_order
+  let { data, error } = await supabase
     .from('student_meals')
-    .select('id, name, price_kleuter, price_lager, is_active, caterer_id, caterers(name)')
+    .select('id, name, price_kleuter, price_lager, is_active, caterer_id, sort_order, caterers(name)')
     .eq('caterer_id', catererId)
+    .order('sort_order', { ascending: true })
     .order('name')
+
+  // Fallback als sort_order kolom nog niet bestaat
+  if (error && (error.code === '42703' || error.message?.includes('sort_order'))) {
+    const fallback = await supabase
+      .from('student_meals')
+      .select('id, name, price_kleuter, price_lager, is_active, caterer_id, caterers(name)')
+      .eq('caterer_id', catererId)
+      .order('name')
+    if (fallback.error) return { error: fallback.error.message }
+    return { meals: fallback.data }
+  }
 
   if (error) return { error: error.message }
   return { meals: data }
@@ -277,11 +321,28 @@ export async function saveStudentMeal(formData: FormData) {
       
     if (error) return { error: error.message }
   } else {
-    const { error } = await supabase
+    let sort_order = 1
+    const { data: maxMeal } = await supabase
       .from('student_meals')
-      .insert({ name, price_kleuter, price_lager, caterer_id, is_active })
+      .select('sort_order')
+      .eq('caterer_id', caterer_id)
+      .order('sort_order', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (maxMeal?.sort_order) sort_order = maxMeal.sort_order + 1
+
+    let { error } = await supabase
+      .from('student_meals')
+      .insert({ name, price_kleuter, price_lager, caterer_id, is_active, sort_order })
       
-    if (error) return { error: error.message }
+    if (error && (error.code === '42703' || error.message?.includes('sort_order'))) {
+      const fb = await supabase
+        .from('student_meals')
+        .insert({ name, price_kleuter, price_lager, caterer_id, is_active })
+      if (fb.error) return { error: fb.error.message }
+    } else if (error) {
+      return { error: error.message }
+    }
   }
 
   revalidatePath('/admin')
@@ -300,6 +361,37 @@ export async function deleteStudentMeal(id: string) {
   if (error) return { error: error.message }
   
   revalidatePath('/admin')
+  return { success: true }
+}
+
+// Wijzig de volgorde van maaltijden (drag and drop)
+export async function updateMealsOrder(mealIds: string[], type: 'teacher' | 'student') {
+  const supabase = await createClient()
+  if (!(await checkAdmin(supabase))) return { error: 'Geen toegang' }
+
+  const table = type === 'teacher' ? 'meals' : 'student_meals'
+
+  // Update de sort_order voor elk id opeenvolgend
+  for (let i = 0; i < mealIds.length; i++) {
+    const { error } = await supabase
+      .from(table)
+      .update({ sort_order: i + 1 })
+      .eq('id', mealIds[i])
+
+    if (error) {
+      if (error.code === '42703' || error.message?.includes('sort_order')) {
+        return { 
+          error: 'De kolom sort_order ontbreekt nog in de database. Voer het SQL script supabase_phase19_meal_sort_order.sql uit in Supabase.' 
+        }
+      }
+      return { error: error.message }
+    }
+  }
+
+  revalidatePath('/admin')
+  revalidatePath('/leerlingen')
+  revalidatePath('/mijn-maaltijden')
+  revalidatePath('/')
   return { success: true }
 }
 
@@ -925,13 +1017,25 @@ export async function getDailyStudentOrdersSummary(schoolId: string, catererId: 
     return { error: 'Fout bij ophalen klassen: ' + classErr.message }
   }
 
-  // 2. Haal actieve student meals op voor deze caterer
-  const { data: meals, error: mealErr } = await supabase
+  // 2. Haal actieve student meals op voor deze caterer (gesorteerd op sort_order)
+  let { data: meals, error: mealErr } = await supabase
     .from('student_meals')
-    .select('id, name, price_kleuter, price_lager')
+    .select('id, name, price_kleuter, price_lager, sort_order')
     .eq('caterer_id', catererId)
     .eq('is_active', true)
+    .order('sort_order', { ascending: true })
     .order('name')
+
+  if (mealErr && (mealErr.code === '42703' || mealErr.message?.includes('sort_order'))) {
+    const fb = await supabase
+      .from('student_meals')
+      .select('id, name, price_kleuter, price_lager')
+      .eq('caterer_id', catererId)
+      .eq('is_active', true)
+      .order('name')
+    meals = fb.data as any
+    mealErr = fb.error
+  }
 
   if (mealErr) {
     console.error('Meals error:', mealErr)

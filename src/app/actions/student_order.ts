@@ -159,13 +159,25 @@ export async function getStudentOrderMatrix(classId: string, schoolId: string, c
     
   if (studErr) return { error: studErr.message }
 
-  // Haal beschikbare maaltijden op voor deze caterer
-  const { data: meals, error: mealsErr } = await supabase
+  // Haal beschikbare maaltijden op voor deze caterer (gesorteerd op sort_order)
+  let { data: meals, error: mealsErr } = await supabase
     .from('student_meals')
-    .select('id, name, price_kleuter, price_lager')
+    .select('id, name, price_kleuter, price_lager, sort_order')
     .eq('caterer_id', catererId)
     .eq('is_active', true)
+    .order('sort_order', { ascending: true })
     .order('name')
+
+  if (mealsErr && (mealsErr.code === '42703' || mealsErr.message?.includes('sort_order'))) {
+    const fallback = await supabase
+      .from('student_meals')
+      .select('id, name, price_kleuter, price_lager')
+      .eq('caterer_id', catererId)
+      .eq('is_active', true)
+      .order('name')
+    meals = fallback.data as any
+    mealsErr = fallback.error
+  }
 
   if (mealsErr) return { error: mealsErr.message }
 
@@ -451,13 +463,25 @@ export async function getStudentOrderMatrixWeekly(classId: string, schoolId: str
     
   if (studErr) return { error: studErr.message }
 
-  // Haal beschikbare maaltijden op voor deze caterer
-  const { data: meals, error: mealsErr } = await supabase
+  // Haal beschikbare maaltijden op voor deze caterer (gesorteerd op sort_order)
+  let { data: meals, error: mealsErr } = await supabase
     .from('student_meals')
-    .select('id, name, price_kleuter, price_lager')
+    .select('id, name, price_kleuter, price_lager, sort_order')
     .eq('caterer_id', catererId)
     .eq('is_active', true)
+    .order('sort_order', { ascending: true })
     .order('name')
+
+  if (mealsErr && (mealsErr.code === '42703' || mealsErr.message?.includes('sort_order'))) {
+    const fallback = await supabase
+      .from('student_meals')
+      .select('id, name, price_kleuter, price_lager')
+      .eq('caterer_id', catererId)
+      .eq('is_active', true)
+      .order('name')
+    meals = fallback.data as any
+    mealsErr = fallback.error
+  }
 
   if (mealsErr) return { error: mealsErr.message }
 

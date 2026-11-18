@@ -29,9 +29,17 @@ function formatDateDisplay(dateString: string) {
   return new Intl.DateTimeFormat('nl-BE', { weekday: 'short', day: 'numeric', month: 'numeric' }).format(new Date(dateString))
 }
 
-export default function StudentOrdersWeeklyClient({ activeSchoolId }: { activeSchoolId: string }) {
+export default function StudentOrdersWeeklyClient({ 
+  activeSchoolId,
+  activeClassId: externalActiveClassId,
+  onSelectClass
+}: { 
+  activeSchoolId: string,
+  activeClassId?: string,
+  onSelectClass?: (classId: string) => void
+}) {
   const [classes, setClasses] = useState<any[]>([])
-  const [activeClassId, setActiveClassId] = useState<string>('')
+  const [activeClassId, setActiveClassId] = useState<string>(externalActiveClassId || '')
   
   // Base date mapped to Monday
   const [weekStart, setWeekStart] = useState<string>(getMonday(new Date()).toISOString().split('T')[0])
@@ -49,6 +57,13 @@ export default function StudentOrdersWeeklyClient({ activeSchoolId }: { activeSc
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{type: 'error'|'success', text: string} | null>(null)
 
+  // Synchroniseer wanneer de actieve klas extern wijzigt (bijv. vanuit dagweergave)
+  useEffect(() => {
+    if (externalActiveClassId && externalActiveClassId !== activeClassId) {
+      setActiveClassId(externalActiveClassId)
+    }
+  }, [externalActiveClassId])
+
   // 1. Haal klassen op
   useEffect(() => {
     async function loadClasses() {
@@ -57,10 +72,21 @@ export default function StudentOrdersWeeklyClient({ activeSchoolId }: { activeSc
         const filteredClasses = res.classes.filter((c: any) => c.school_id === activeSchoolId)
         setClasses(filteredClasses)
         if (filteredClasses.length > 0) {
-          setActiveClassId(filteredClasses[0].id)
+          const candidate = externalActiveClassId || activeClassId
+          const targetId = (candidate && filteredClasses.some((c: any) => c.id === candidate))
+            ? candidate
+            : filteredClasses[0].id
+
+          setActiveClassId(targetId)
+          onSelectClass?.(targetId)
+        } else {
+          setActiveClassId('')
+          onSelectClass?.('')
         }
       } else {
         setClasses([])
+        setActiveClassId('')
+        onSelectClass?.('')
       }
       setLoading(false)
     }
@@ -324,7 +350,10 @@ export default function StudentOrdersWeeklyClient({ activeSchoolId }: { activeSc
                   <button 
                     key={c.id} 
                     className={`${styles.classTile} ${activeClassId === c.id ? styles.classTileActive : ''}`}
-                    onClick={() => setActiveClassId(c.id)}
+                    onClick={() => {
+                      setActiveClassId(c.id)
+                      onSelectClass?.(c.id)
+                    }}
                   >
                     {c.name}
                   </button>

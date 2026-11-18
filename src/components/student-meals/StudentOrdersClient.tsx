@@ -1,12 +1,35 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import StudentOrdersDailyClient from './StudentOrdersDailyClient'
 import StudentOrdersWeeklyClient from './StudentOrdersWeeklyClient'
 import styles from './StudentOrdersClient.module.css'
 
 export default function StudentOrdersClient({ activeSchoolId }: { activeSchoolId: string }) {
   const [viewMode, setViewMode] = useState<'daily' | 'weekly'>('daily')
+  
+  // Bewaar de geselecteerde klas zodat deze behouden blijft bij het schakelen tussen dag- en weekweergave
+  const [activeClassId, setActiveClassId] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem('student_orders_active_class_' + activeSchoolId) || ''
+    }
+    return ''
+  })
+
+  // Als de actieve school verandert, laad de opgeslagen klas voor die school
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = sessionStorage.getItem('student_orders_active_class_' + activeSchoolId)
+      setActiveClassId(saved || '')
+    }
+  }, [activeSchoolId])
+
+  const handleSelectClass = (classId: string) => {
+    setActiveClassId(classId)
+    if (typeof window !== 'undefined' && classId) {
+      sessionStorage.setItem('student_orders_active_class_' + activeSchoolId, classId)
+    }
+  }
 
   return (
     <div className={styles.wrapperContainer}>
@@ -26,9 +49,17 @@ export default function StudentOrdersClient({ activeSchoolId }: { activeSchoolId
       </div>
 
       {viewMode === 'daily' ? (
-        <StudentOrdersDailyClient activeSchoolId={activeSchoolId} />
+        <StudentOrdersDailyClient 
+          activeSchoolId={activeSchoolId} 
+          activeClassId={activeClassId}
+          onSelectClass={handleSelectClass}
+        />
       ) : (
-        <StudentOrdersWeeklyClient activeSchoolId={activeSchoolId} />
+        <StudentOrdersWeeklyClient 
+          activeSchoolId={activeSchoolId} 
+          activeClassId={activeClassId}
+          onSelectClass={handleSelectClass}
+        />
       )}
     </div>
   )

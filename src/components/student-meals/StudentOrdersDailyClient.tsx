@@ -56,29 +56,35 @@ export default function StudentOrdersDailyClient({
         } else {
           setActiveClassId('')
           onSelectClass?.('')
+          setLoading(false)
         }
       } else {
         setClasses([])
         setActiveClassId('')
         onSelectClass?.('')
+        setLoading(false)
       }
-      setLoading(false)
     }
     loadClasses()
   }, [activeSchoolId])
 
-  // 2. Haal matrix op als class of date wijzigt
+  // 2. Haal matrix op als class, date of classes wijzigt
   useEffect(() => {
-    if (!activeClassId || !date) return
-    loadMatrix()
-  }, [activeClassId, date])
-
-  async function loadMatrix() {
-    setLoading(true)
-    setMessage(null)
-    
+    if (!activeClassId || !date || classes.length === 0) return
     const selectedClass = classes.find(c => c.id === activeClassId)
     if (!selectedClass) return
+    loadMatrix(selectedClass)
+  }, [activeClassId, date, classes])
+
+  async function loadMatrix(classObj?: any) {
+    const selectedClass = classObj || classes.find(c => c.id === activeClassId)
+    if (!selectedClass) {
+      setLoading(false)
+      return
+    }
+
+    setLoading(true)
+    setMessage(null)
 
     const res = await getStudentOrderMatrix(activeClassId, selectedClass.school_id, selectedClass.schools.caterer_id, date)
     
@@ -345,13 +351,19 @@ export default function StudentOrdersDailyClient({
                   })}
                 </tr>
               ))}
-              {students.length === 0 && !loading && (
+              {loading ? (
+                <tr>
+                  <td colSpan={meals.length + 2} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    Laden...
+                  </td>
+                </tr>
+              ) : students.length === 0 ? (
                 <tr>
                   <td colSpan={meals.length + 2} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
                     Geen leerlingen gevonden in deze klas.
                   </td>
                 </tr>
-              )}
+              ) : null}
             </tbody>
           </table>
         </div>

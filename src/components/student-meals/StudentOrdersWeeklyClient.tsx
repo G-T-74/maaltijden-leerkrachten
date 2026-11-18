@@ -82,29 +82,35 @@ export default function StudentOrdersWeeklyClient({
         } else {
           setActiveClassId('')
           onSelectClass?.('')
+          setLoading(false)
         }
       } else {
         setClasses([])
         setActiveClassId('')
         onSelectClass?.('')
+        setLoading(false)
       }
-      setLoading(false)
     }
     loadClasses()
   }, [activeSchoolId])
 
-  // 2. Haal matrix op als class of week wijzigt
+  // 2. Haal matrix op als class, weekStart of classes wijzigt
   useEffect(() => {
-    if (!activeClassId || !weekStart) return
-    loadMatrix()
-  }, [activeClassId, weekStart])
-
-  async function loadMatrix() {
-    setLoading(true)
-    setMessage(null)
-    
+    if (!activeClassId || !weekStart || classes.length === 0) return
     const selectedClass = classes.find(c => c.id === activeClassId)
     if (!selectedClass) return
+    loadMatrix(selectedClass)
+  }, [activeClassId, weekStart, classes])
+
+  async function loadMatrix(classObj?: any) {
+    const selectedClass = classObj || classes.find(c => c.id === activeClassId)
+    if (!selectedClass) {
+      setLoading(false)
+      return
+    }
+
+    setLoading(true)
+    setMessage(null)
 
     const res = await getStudentOrderMatrixWeekly(activeClassId, selectedClass.school_id, selectedClass.schools.caterer_id, weekDates)
     
@@ -479,13 +485,19 @@ export default function StudentOrdersWeeklyClient({
                   })}
                 </tr>
               ))}
-              {students.length === 0 && !loading && (
+              {loading ? (
+                <tr>
+                  <td colSpan={weekDates.length + 2} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    Laden...
+                  </td>
+                </tr>
+              ) : students.length === 0 ? (
                 <tr>
                   <td colSpan={weekDates.length + 2} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
                     Geen leerlingen gevonden in deze klas.
                   </td>
                 </tr>
-              )}
+              ) : null}
             </tbody>
           </table>
         </div>

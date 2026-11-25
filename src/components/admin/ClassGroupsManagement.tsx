@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { getClassGroups, createClassGroup, updateClassGroup, deleteClassGroup, assignClassToGroup } from '@/app/actions/admin'
 import { getClassesAndStudents } from '@/app/actions/student_admin'
+import { useUnsavedChanges } from '@/components/UnsavedChangesProvider'
 
 export default function ClassGroupsManagement({ schoolId }: { schoolId: string }) {
   const [groups, setGroups] = useState<any[]>([])
@@ -14,6 +15,14 @@ export default function ClassGroupsManagement({ schoolId }: { schoolId: string }
   const [creating, setCreating] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [successMsg, setSuccessMsg] = useState('')
+
+  const { setHasUnsavedChanges } = useUnsavedChanges()
+  const isDirty = newGroupName.trim() !== '' || newGroupCode.trim() !== ''
+
+  useEffect(() => {
+    setHasUnsavedChanges(isDirty)
+    return () => setHasUnsavedChanges(false)
+  }, [isDirty, setHasUnsavedChanges])
 
   useEffect(() => {
     loadData()

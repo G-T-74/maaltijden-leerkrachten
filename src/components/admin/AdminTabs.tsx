@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { getSchoolsWithDeadlines, setActiveAdminSchool } from '@/app/actions/admin'
+import { useUnsavedChanges } from '@/components/UnsavedChangesProvider'
 import DailyOrdersReport from './DailyOrdersReport'
 import KitchenTotalsReport from './KitchenTotalsReport'
 import MonthlyOverviewReport from './MonthlyOverviewReport'
@@ -21,6 +22,7 @@ export default function AdminTabs() {
   const [schools, setSchools] = useState<any[]>([])
   const [activeSchoolId, setActiveSchoolId] = useState<string>('')
   const [loading, setLoading] = useState(true)
+  const { hasUnsavedChanges, confirmIfUnsaved } = useUnsavedChanges()
 
   useEffect(() => {
     async function loadSchools() {
@@ -39,7 +41,15 @@ export default function AdminTabs() {
     loadSchools()
   }, [])
 
+  const handleTabChange = (tab: TabKey) => {
+    if (tab === activeTab) return
+    if (hasUnsavedChanges && !confirmIfUnsaved()) return
+    setActiveTab(tab)
+  }
+
   const handleSchoolChange = async (newId: string) => {
+    if (newId === activeSchoolId) return
+    if (hasUnsavedChanges && !confirmIfUnsaved()) return
     setActiveSchoolId(newId)
     await setActiveAdminSchool(newId)
   }
@@ -145,7 +155,7 @@ export default function AdminTabs() {
             {/* DAGOVERZICHT */}
             <button 
               className={`${styles.reportCardBtn} ${activeTab === 'daily' ? styles.activeReport : ''}`}
-              onClick={() => setActiveTab('daily')}
+              onClick={() => handleTabChange('daily')}
             >
               <div className={styles.iconWrapper}>
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -165,7 +175,7 @@ export default function AdminTabs() {
             {/* KEUKENOVERZICHT */}
             <button 
               className={`${styles.reportCardBtn} ${activeTab === 'kitchen' ? styles.activeReport : ''}`}
-              onClick={() => setActiveTab('kitchen')}
+              onClick={() => handleTabChange('kitchen')}
             >
               <div className={styles.iconWrapper}>
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -183,7 +193,7 @@ export default function AdminTabs() {
             {/* MAANDOVERZICHT */}
             <button 
               className={`${styles.reportCardBtn} ${activeTab === 'monthly' ? styles.activeReport : ''}`}
-              onClick={() => setActiveTab('monthly')}
+              onClick={() => handleTabChange('monthly')}
             >
               <div className={styles.iconWrapper}>
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -209,7 +219,7 @@ export default function AdminTabs() {
             {/* MAALTIJDEN */}
             <button 
               className={`${styles.mgmtTabBtn} ${activeTab === 'meals' ? styles.activeMgmt : ''}`}
-              onClick={() => setActiveTab('meals')}
+              onClick={() => handleTabChange('meals')}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M18 8h1a4 4 0 0 1 0 8h-1"/>
@@ -224,7 +234,7 @@ export default function AdminTabs() {
             {/* LEERLINGEN & KLASSEN */}
             <button 
               className={`${styles.mgmtTabBtn} ${activeTab === 'students' ? styles.activeMgmt : ''}`}
-              onClick={() => setActiveTab('students')}
+              onClick={() => handleTabChange('students')}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
@@ -238,7 +248,7 @@ export default function AdminTabs() {
             {/* KLASSENGROEPEN */}
             <button 
               className={`${styles.mgmtTabBtn} ${activeTab === 'groups' ? styles.activeMgmt : ''}`}
-              onClick={() => setActiveTab('groups')}
+              onClick={() => handleTabChange('groups')}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polygon points="12 2 2 7 12 12 22 7 12 2"/>
@@ -251,7 +261,7 @@ export default function AdminTabs() {
             {/* LEERKRACHTEN */}
             <button 
               className={`${styles.mgmtTabBtn} ${activeTab === 'teachers' ? styles.activeMgmt : ''}`}
-              onClick={() => setActiveTab('teachers')}
+              onClick={() => handleTabChange('teachers')}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
@@ -263,7 +273,7 @@ export default function AdminTabs() {
             {/* INSTELLINGEN */}
             <button 
               className={`${styles.mgmtTabBtn} ${activeTab === 'settings' ? styles.activeMgmt : ''}`}
-              onClick={() => setActiveTab('settings')}
+              onClick={() => handleTabChange('settings')}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="3"/>

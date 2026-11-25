@@ -4,6 +4,7 @@ import { useState, useEffect, Fragment } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { updateOrder, deleteOrder } from '@/app/actions/order'
 import { getAdminMeals, getDailyStudentOrdersSummary } from '@/app/actions/admin'
+import { useUnsavedChanges } from '@/components/UnsavedChangesProvider'
 import styles from './DailyOrdersReport.module.css'
 
 interface StudentMeal {
@@ -45,6 +46,21 @@ export default function DailyOrdersReport({ schoolId, catererId }: { schoolId: s
   const [editMealId, setEditMealId] = useState('')
   const [editQuantity, setEditQuantity] = useState(1)
   const [savingId, setSavingId] = useState<string | null>(null)
+
+  const isDirty = editingId !== null
+  const { setHasUnsavedChanges, confirmIfUnsaved } = useUnsavedChanges()
+
+  useEffect(() => {
+    setHasUnsavedChanges(isDirty)
+    return () => setHasUnsavedChanges(false)
+  }, [isDirty, setHasUnsavedChanges])
+
+  const handleDateChange = (newDate: string) => {
+    if (newDate === date) return
+    if (isDirty && !confirmIfUnsaved()) return
+    setDate(newDate)
+    setEditingId(null)
+  }
 
   const supabase = createClient()
 
@@ -179,7 +195,7 @@ export default function DailyOrdersReport({ schoolId, catererId }: { schoolId: s
             <input 
               type="date" 
               value={date} 
-              onChange={(e) => setDate(e.target.value)}
+              onChange={(e) => handleDateChange(e.target.value)}
               className={styles.dateInput}
             />
           </div>

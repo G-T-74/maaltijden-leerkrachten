@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { getTeacherClasses, getStudentOrderMatrix, saveStudentOrdersBulk, copyPreviousStudentOrders } from '@/app/actions/student_order'
+import { useUnsavedChanges } from '@/components/UnsavedChangesProvider'
 import styles from './StudentOrdersClient.module.css'
 
 export default function StudentOrdersDailyClient({ 
@@ -30,6 +31,8 @@ export default function StudentOrdersDailyClient({
   
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{type: 'error'|'success', text: string} | null>(null)
+
+  const { setHasUnsavedChanges, confirmIfUnsaved } = useUnsavedChanges()
 
   // Synchroniseer wanneer de actieve klas extern wijzigt (bijv. vanuit weekweergave)
   useEffect(() => {
@@ -224,6 +227,24 @@ export default function StudentOrdersDailyClient({
     return false
   })()
 
+  useEffect(() => {
+    setHasUnsavedChanges(hasUnsavedChanges)
+    return () => setHasUnsavedChanges(false)
+  }, [hasUnsavedChanges, setHasUnsavedChanges])
+
+  const handleClassClick = (classId: string) => {
+    if (classId === activeClassId) return
+    if (hasUnsavedChanges && !confirmIfUnsaved()) return
+    setActiveClassId(classId)
+    onSelectClass?.(classId)
+  }
+
+  const handleDateChange = (newDate: string) => {
+    if (newDate === date) return
+    if (hasUnsavedChanges && !confirmIfUnsaved()) return
+    setDate(newDate)
+  }
+
   const isAllSaved = initialOrders.length > 0 && !hasUnsavedChanges
 
   return (
@@ -271,10 +292,7 @@ export default function StudentOrdersDailyClient({
                   <button 
                     key={c.id} 
                     className={`${styles.classTile} ${activeClassId === c.id ? styles.classTileActive : ''}`}
-                    onClick={() => {
-                      setActiveClassId(c.id)
-                      onSelectClass?.(c.id)
-                    }}
+                    onClick={() => handleClassClick(c.id)}
                   >
                     {c.name}
                   </button>
@@ -292,7 +310,7 @@ export default function StudentOrdersDailyClient({
               <input 
                 type="date" 
                 value={date} 
-                onChange={e => setDate(e.target.value)}
+                onChange={e => handleDateChange(e.target.value)}
                 className={styles.dateInput}
               />
             </div>

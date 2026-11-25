@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { getMealsForSchool, placeOrder, checkDayLock } from '@/app/actions/order'
+import { useUnsavedChanges } from '@/components/UnsavedChangesProvider'
 import styles from './OrderForm.module.css'
 
 type School = {
@@ -36,6 +37,14 @@ export default function OrderForm({ activeSchool, preferredCategory }: OrderForm
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<boolean>(false)
+
+  const { setHasUnsavedChanges } = useUnsavedChanges()
+  const isDirty = !!selectedMealId && !success
+
+  useEffect(() => {
+    setHasUnsavedChanges(isDirty)
+    return () => setHasUnsavedChanges(false)
+  }, [isDirty, setHasUnsavedChanges])
 
   // Bereken unieke categorieën
   const categories = Array.from(new Set(meals.map(m => m.category))).sort()

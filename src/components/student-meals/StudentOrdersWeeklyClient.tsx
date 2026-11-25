@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { getTeacherClasses, getStudentOrderMatrixWeekly, saveStudentOrdersBulkWeekly, getLastFilledStudentOrdersForClass } from '@/app/actions/student_order'
+import { useUnsavedChanges } from '@/components/UnsavedChangesProvider'
 import styles from './StudentOrdersClient.module.css'
 
 function getMonday(d: Date) {
@@ -56,6 +57,8 @@ export default function StudentOrdersWeeklyClient({
   
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{type: 'error'|'success', text: string} | null>(null)
+
+  const { setHasUnsavedChanges, confirmIfUnsaved } = useUnsavedChanges()
 
   // Synchroniseer wanneer de actieve klas extern wijzigt (bijv. vanuit dagweergave)
   useEffect(() => {
@@ -154,7 +157,10 @@ export default function StudentOrdersWeeklyClient({
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedDate = new Date(e.target.value)
     if (!isNaN(selectedDate.getTime())) {
-      setWeekStart(getMonday(selectedDate).toISOString().split('T')[0])
+      const newWeekStart = getMonday(selectedDate).toISOString().split('T')[0]
+      if (newWeekStart === weekStart) return
+      if (hasUnsavedChanges && !confirmIfUnsaved()) return
+      setWeekStart(newWeekStart)
     }
   }
 
@@ -338,6 +344,18 @@ export default function StudentOrdersWeeklyClient({
     return false
   })()
 
+  useEffect(() => {
+    setHasUnsavedChanges(hasUnsavedChanges)
+    return () => setHasUnsavedChanges(false)
+  }, [hasUnsavedChanges, setHasUnsavedChanges])
+
+  const handleClassClick = (classId: string) => {
+    if (classId === activeClassId) return
+    if (hasUnsavedChanges && !confirmIfUnsaved()) return
+    setActiveClassId(classId)
+    onSelectClass?.(classId)
+  }
+
   const hasAnySavedOrders = Object.values(initialOrders).some(dayOrders => 
     Object.values(dayOrders).some((o: any) => o && o.meal_id)
   )
@@ -356,10 +374,7 @@ export default function StudentOrdersWeeklyClient({
                   <button 
                     key={c.id} 
                     className={`${styles.classTile} ${activeClassId === c.id ? styles.classTileActive : ''}`}
-                    onClick={() => {
-                      setActiveClassId(c.id)
-                      onSelectClass?.(c.id)
-                    }}
+                    onClick={() => handleClassClick(c.id)}
                   >
                     {c.name}
                   </button>

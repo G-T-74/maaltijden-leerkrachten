@@ -14,6 +14,7 @@ import {
   getActiveDayLocks,
   removeDayLock
 } from '@/app/actions/admin'
+import { useUnsavedChanges } from '@/components/UnsavedChangesProvider'
 import styles from './SchoolSettings.module.css'
 
 type School = {
@@ -73,6 +74,27 @@ export default function SchoolSettings() {
   const [toddlerFactors, setToddlerFactors] = useState<Record<string, boolean>>({})
   const [savingId, setSavingId] = useState<string | null>(null)
   const [resettingId, setResettingId] = useState<string | null>(null)
+
+  const { setHasUnsavedChanges } = useUnsavedChanges()
+
+  const hasUnsavedSettings = schools.some(s => {
+    let dl = s.order_deadline || '08:15:00'
+    if (dl.split(':').length === 3) dl = dl.substring(0, 5)
+    let studentDl = s.student_order_deadline || '08:15:00'
+    if (studentDl.split(':').length === 3) studentDl = studentDl.substring(0, 5)
+    const factor = s.apply_toddler_factor || false
+
+    return (
+      (deadlines[s.id] !== undefined && deadlines[s.id] !== dl) ||
+      (studentDeadlines[s.id] !== undefined && studentDeadlines[s.id] !== studentDl) ||
+      (toddlerFactors[s.id] !== undefined && toddlerFactors[s.id] !== factor)
+    )
+  })
+
+  useEffect(() => {
+    setHasUnsavedChanges(hasUnsavedSettings)
+    return () => setHasUnsavedChanges(false)
+  }, [hasUnsavedSettings, setHasUnsavedChanges])
 
   // Day unlocks state
   const [activeUnlocks, setActiveUnlocks] = useState<any[]>([])
@@ -209,6 +231,12 @@ export default function SchoolSettings() {
     if (resTeacher.error || resStudent.error || resFactor.error) {
       setError(resTeacher.error || resStudent.error || resFactor.error || 'Er is een fout opgetreden.')
     } else {
+      setSchools(prev => prev.map(s => s.id === schoolId ? {
+        ...s,
+        order_deadline: timeToSave,
+        student_order_deadline: studentTimeToSave,
+        apply_toddler_factor: toddlerFactors[schoolId]
+      } : s))
       setSuccessMsg('Instellingen succesvol opgeslagen.')
       setTimeout(() => setSuccessMsg(null), 3000)
     }

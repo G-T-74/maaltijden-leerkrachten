@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Papa from 'papaparse'
 import { importStudentsCsv, getClassesAndStudents, toggleStudentVisibility, addStudentManually, getTeachersAndClasses, toggleTeacherClass } from '@/app/actions/student_admin'
+import { useUnsavedChanges } from '@/components/UnsavedChangesProvider'
 import styles from './StudentsManagement.module.css'
 
 type CsvRow = {
@@ -37,6 +38,14 @@ export default function StudentsManagement({ schoolId }: { schoolId: string }) {
   // Teachers State
   const [teachers, setTeachers] = useState<any[]>([])
   const [links, setLinks] = useState<any[]>([])
+
+  const { setHasUnsavedChanges } = useUnsavedChanges()
+  const isDirty = csvData.length > 0 || (addMode !== null && (newName.trim() !== '' || newNum.trim() !== ''))
+
+  useEffect(() => {
+    setHasUnsavedChanges(isDirty)
+    return () => setHasUnsavedChanges(false)
+  }, [isDirty, setHasUnsavedChanges])
   useEffect(() => {
     loadData()
   }, [schoolId])

@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
+import { useUnsavedChanges } from '@/components/UnsavedChangesProvider'
 
 type School = {
   id: string
@@ -20,11 +21,17 @@ type SchoolHeaderProps = {
 export default function SchoolHeader({ userSchools, activeSchoolId, basePath }: SchoolHeaderProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { hasUnsavedChanges, confirmIfUnsaved } = useUnsavedChanges()
 
   const activeSchool = userSchools.find(us => us.school.id === activeSchoolId)?.school
 
   const handleSchoolChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newSchoolId = e.target.value
+    if (newSchoolId === activeSchoolId) return
+    if (hasUnsavedChanges && !confirmIfUnsaved()) {
+      e.target.value = activeSchoolId
+      return
+    }
     document.cookie = `activeSchoolId=${newSchoolId}; path=/; max-age=31536000; SameSite=Lax`
     const currentParams = new URLSearchParams(Array.from(searchParams.entries()))
     currentParams.set('school', newSchoolId)

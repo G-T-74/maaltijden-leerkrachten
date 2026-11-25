@@ -11,6 +11,7 @@ import {
   deleteStudentMeal,
   updateMealsOrder 
 } from '@/app/actions/admin'
+import { useUnsavedChanges } from '@/components/UnsavedChangesProvider'
 import styles from './MealsManagement.module.css'
 
 type Meal = {
@@ -59,6 +60,22 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
   const [editId, setEditId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<Partial<Meal>>({})
   const [savingEdit, setSavingEdit] = useState(false)
+
+  const isDirty = editId !== null || newName.trim() !== ''
+  const { setHasUnsavedChanges, confirmIfUnsaved } = useUnsavedChanges()
+
+  useEffect(() => {
+    setHasUnsavedChanges(isDirty)
+    return () => setHasUnsavedChanges(false)
+  }, [isDirty, setHasUnsavedChanges])
+
+  const handleTabSwitch = (tab: 'teacher' | 'student') => {
+    if (tab === activeTab) return
+    if (isDirty && !confirmIfUnsaved()) return
+    setActiveTab(tab)
+    resetNewForm()
+    cancelEdit()
+  }
 
   const loadData = async () => {
     setLoading(true)
@@ -270,13 +287,13 @@ export default function MealsManagement({ catererId: activeCatererId }: { catere
         
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           <button 
-            onClick={() => { setActiveTab('teacher'); resetNewForm(); cancelEdit(); }}
+            onClick={() => handleTabSwitch('teacher')}
             className={`${styles.btn} ${activeTab === 'teacher' ? styles.btnPrimary : styles.btnSecondary}`}
           >
             Leerkrachten
           </button>
           <button 
-            onClick={() => { setActiveTab('student'); resetNewForm(); cancelEdit(); }}
+            onClick={() => handleTabSwitch('student')}
             className={`${styles.btn} ${activeTab === 'student' ? styles.btnPrimary : styles.btnSecondary}`}
           >
             Leerlingen

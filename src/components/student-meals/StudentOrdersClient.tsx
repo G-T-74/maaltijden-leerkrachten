@@ -1,12 +1,14 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useUnsavedChanges } from '@/components/UnsavedChangesProvider'
 import StudentOrdersDailyClient from './StudentOrdersDailyClient'
 import StudentOrdersWeeklyClient from './StudentOrdersWeeklyClient'
 import styles from './StudentOrdersClient.module.css'
 
 export default function StudentOrdersClient({ activeSchoolId }: { activeSchoolId: string }) {
   const [viewMode, setViewMode] = useState<'daily' | 'weekly'>('daily')
+  const { hasUnsavedChanges, confirmIfUnsaved } = useUnsavedChanges()
   
   // Bewaar de geselecteerde klas zodat deze behouden blijft bij het schakelen tussen dag- en weekweergave
   const [activeClassId, setActiveClassId] = useState<string>(() => {
@@ -24,6 +26,12 @@ export default function StudentOrdersClient({ activeSchoolId }: { activeSchoolId
     }
   }, [activeSchoolId])
 
+  const handleViewModeChange = (mode: 'daily' | 'weekly') => {
+    if (mode === viewMode) return
+    if (hasUnsavedChanges && !confirmIfUnsaved()) return
+    setViewMode(mode)
+  }
+
   const handleSelectClass = (classId: string) => {
     setActiveClassId(classId)
     if (typeof window !== 'undefined' && classId) {
@@ -36,13 +44,13 @@ export default function StudentOrdersClient({ activeSchoolId }: { activeSchoolId
       <div className={styles.viewToggle}>
         <button 
           className={`${styles.toggleBtn} ${viewMode === 'daily' ? styles.toggleBtnActive : ''}`}
-          onClick={() => setViewMode('daily')}
+          onClick={() => handleViewModeChange('daily')}
         >
           Dagweergave
         </button>
         <button 
           className={`${styles.toggleBtn} ${viewMode === 'weekly' ? styles.toggleBtnActive : ''}`}
-          onClick={() => setViewMode('weekly')}
+          onClick={() => handleViewModeChange('weekly')}
         >
           Weekweergave
         </button>

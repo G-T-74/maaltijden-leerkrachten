@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, Fragment } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import styles from './MonthlyOverviewReport.module.css'
 
@@ -36,19 +36,22 @@ export default function MonthlyOverviewReport({ schoolId }: { schoolId: string }
     const d = new Date()
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
   })
-  const [compactView, setCompactView] = useState(false)
   const [orders, setOrders] = useState<any[]>([])
   const [studentOrders, setStudentOrders] = useState<any[]>([])
   const [studentsMap, setStudentsMap] = useState<Record<string, { name: string, classNumber: number | null, classId: string, className: string, level: string }>>({})
   const [loading, setLoading] = useState(true)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [expandedClasses, setExpandedClasses] = useState<Record<string, boolean>>({})
+  const [expandedStudents, setExpandedStudents] = useState<Record<string, boolean>>({})
+  const [expandedTeachers, setExpandedTeachers] = useState<Record<string, boolean>>({})
 
   const supabase = createClient()
 
-  // Reset uitgeklapte klassen bij verandering van maand of school (standaard samengevouwen)
+  // Reset uitgeklapte items bij verandering van maand of school
   useEffect(() => {
     setExpandedClasses({})
+    setExpandedStudents({})
+    setExpandedTeachers({})
   }, [month, schoolId])
 
   useEffect(() => {
@@ -273,10 +276,33 @@ export default function MonthlyOverviewReport({ schoolId }: { schoolId: string }
     }
   }, [month])
 
+  const formatOrderDate = (dateStr: string) => {
+    try {
+      const d = new Date(dateStr + 'T00:00:00')
+      return d.toLocaleDateString('nl-BE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' })
+    } catch {
+      return dateStr
+    }
+  }
+
   const toggleClass = (classKey: string) => {
     setExpandedClasses(prev => ({
       ...prev,
       [classKey]: !prev[classKey]
+    }))
+  }
+
+  const toggleStudent = (studentId: string) => {
+    setExpandedStudents(prev => ({
+      ...prev,
+      [studentId]: !prev[studentId]
+    }))
+  }
+
+  const toggleTeacher = (teacherName: string) => {
+    setExpandedTeachers(prev => ({
+      ...prev,
+      [teacherName]: !prev[teacherName]
     }))
   }
 
@@ -290,6 +316,19 @@ export default function MonthlyOverviewReport({ schoolId }: { schoolId: string }
 
   const collapseAllClasses = () => {
     setExpandedClasses({})
+    setExpandedStudents({})
+  }
+
+  const expandAllTeachers = () => {
+    const all: Record<string, boolean> = {}
+    groupedByTeacher.forEach(t => {
+      all[t.name] = true
+    })
+    setExpandedTeachers(all)
+  }
+
+  const collapseAllTeachers = () => {
+    setExpandedTeachers({})
   }
 
   return (
@@ -313,16 +352,6 @@ export default function MonthlyOverviewReport({ schoolId }: { schoolId: string }
               className={styles.monthInput}
             />
           </div>
-
-          <label className={styles.checkboxLabel} style={{ alignSelf: 'flex-end', paddingBottom: '0.5rem' }}>
-            <input 
-              type="checkbox" 
-              checked={compactView}
-              onChange={(e) => setCompactView(e.target.checked)}
-              style={{ width: 'auto', margin: 0 }}
-            />
-            <span>Beknopt overzicht (enkel totalen)</span>
-          </label>
 
           <button 
             type="button" 
@@ -373,19 +402,40 @@ export default function MonthlyOverviewReport({ schoolId }: { schoolId: string }
         <p style={{ color: 'var(--text-muted)', padding: '2rem 0' }}>Overzicht laden...</p>
       ) : groupedByTeacher.length === 0 && groupedByClass.length === 0 ? (
         <div className={styles.emptyState}>Geen bestellingen gevonden voor {formattedMonth}.</div>
-      ) : compactView ? (
-        /* ================= BEKNOPT OVERZICHT ================= */
+      ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
           
-          {/* Facturatie Leerkrachten (Beknopt) */}
+          {/* Facturatie Leerkrachten */}
           <div className={styles.section}>
             <div className={styles.sectionHeader}>
               <h3 className={styles.sectionTitle}>
                 <span>👩‍🏫</span> Facturatie Leerkrachten
               </h3>
-              <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                Totaal: <strong>€{totalTeachersBilling.toFixed(2)}</strong> ({totalTeacherMeals} maaltijden)
-              </span>
+              <div className={styles.sectionActions}>
+                <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginRight: '0.5rem' }}>
+                  Totaal: <strong>€{totalTeachersBilling.toFixed(2)}</strong> ({totalTeacherMeals} maaltijden)
+                </span>
+                {groupedByTeacher.length > 0 && (
+                  <>
+                    <button 
+                      type="button" 
+                      onClick={expandAllTeachers} 
+                      className={styles.actionBtn}
+                      title="Toon details van alle leerkrachten"
+                    >
+                      ▼ Details uitklappen
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={collapseAllTeachers} 
+                      className={styles.actionBtn}
+                      title="Verberg details van alle leerkrachten"
+                    >
+                      ▲ Details inklappen
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
 
             {groupedByTeacher.length === 0 ? (
@@ -401,13 +451,68 @@ export default function MonthlyOverviewReport({ schoolId }: { schoolId: string }
                     </tr>
                   </thead>
                   <tbody>
-                    {groupedByTeacher.map(teacher => (
-                      <tr key={teacher.name} className={styles.trHover}>
-                        <td style={{ fontWeight: 500 }}>{teacher.name}</td>
-                        <td className={styles.tdCenter}>{teacher.totalMeals}</td>
-                        <td className={styles.tdRight} style={{ fontWeight: 700 }}>€{teacher.total.toFixed(2)}</td>
-                      </tr>
-                    ))}
+                    {groupedByTeacher.map(teacher => {
+                      const isExpanded = !!expandedTeachers[teacher.name]
+
+                      return (
+                        <Fragment key={teacher.name}>
+                          <tr 
+                            className={`${styles.trHover} ${styles.clickableRow} ${isExpanded ? styles.rowExpanded : ''}`}
+                            onClick={() => toggleTeacher(teacher.name)}
+                            title="Klik om details van deze leerkracht te tonen/verbergen"
+                          >
+                            <td style={{ fontWeight: 600 }}>
+                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <span className={`${styles.chevron} ${isExpanded ? styles.chevronRotated : ''}`} style={{ fontSize: '0.75rem', width: '14px' }}>▶</span>
+                                <span className={styles.clickableName}>{teacher.name}</span>
+                              </div>
+                            </td>
+                            <td className={styles.tdCenter}>{teacher.totalMeals}</td>
+                            <td className={styles.tdRight} style={{ fontWeight: 700 }}>€{teacher.total.toFixed(2)}</td>
+                          </tr>
+
+                          {/* Uitgeklapte bestellingen voor deze leerkracht */}
+                          {isExpanded && (
+                            <tr className={styles.detailSubRow}>
+                              <td colSpan={3} style={{ padding: 0 }}>
+                                <div className={styles.detailContainer}>
+                                  <div className={styles.detailSubHeader}>
+                                    <span>📋 Bestellingen voor {teacher.name} ({teacher.orders.length} bestelling{teacher.orders.length === 1 ? '' : 'en'})</span>
+                                    <span style={{ fontWeight: 700, color: 'var(--primary)' }}>Subtotaal: €{teacher.total.toFixed(2)}</span>
+                                  </div>
+                                  <table className={`${styles.table} ${styles.detailTable}`}>
+                                    <thead>
+                                      <tr>
+                                        <th style={{ width: '140px' }}>Datum</th>
+                                        <th>Maaltijd</th>
+                                        <th className={styles.thCenter} style={{ width: '80px' }}>Aantal</th>
+                                        <th>Opmerking</th>
+                                        <th className={styles.thRight} style={{ width: '110px' }}>Prijs</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {teacher.orders.map(order => (
+                                        <tr key={order.id}>
+                                          <td>{formatOrderDate(order.order_date)}</td>
+                                          <td style={{ fontWeight: 500 }}>{order.meals?.name || 'Onbekend'}</td>
+                                          <td className={styles.tdCenter}>{order.quantity}</td>
+                                          <td style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>
+                                            {order.note || '-'}
+                                          </td>
+                                          <td className={styles.tdRight} style={{ fontWeight: 600 }}>
+                                            €{((order.quantity || 1) * (order.price_at_order || 0)).toFixed(2)}
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      )
+                    })}
                   </tbody>
                   <tfoot>
                     <tr className={styles.trFooter}>
@@ -421,7 +526,7 @@ export default function MonthlyOverviewReport({ schoolId }: { schoolId: string }
             )}
           </div>
           
-          {/* Facturatie Leerlingen (Beknopt: Gebundeld per klas) */}
+          {/* Facturatie Leerlingen (Gebundeld per klas) */}
           {groupedByClass.length > 0 && (
             <div className={styles.section}>
               <div className={styles.sectionHeader}>
@@ -434,14 +539,14 @@ export default function MonthlyOverviewReport({ schoolId }: { schoolId: string }
                     onClick={expandAllClasses} 
                     className={styles.actionBtn}
                   >
-                    ▼ Alles uitklappen
+                    ▼ Klassen uitklappen
                   </button>
                   <button 
                     type="button" 
                     onClick={collapseAllClasses} 
                     className={styles.actionBtn}
                   >
-                    ▲ Alles inklappen
+                    ▲ Klassen inklappen
                   </button>
                 </div>
               </div>
@@ -484,20 +589,71 @@ export default function MonthlyOverviewReport({ schoolId }: { schoolId: string }
                                 </tr>
                               </thead>
                               <tbody>
-                                {group.students.map((student) => (
-                                  <tr key={student.studentId} className={styles.trHover}>
-                                    <td className={styles.tdCenter}>
-                                      <span className={styles.classNumberBadge}>
-                                        {student.classNumber != null ? `#${student.classNumber}` : '-'}
-                                      </span>
-                                    </td>
-                                    <td style={{ fontWeight: 500 }}>{student.studentName}</td>
-                                    <td className={styles.tdCenter}>{student.totalMeals}</td>
-                                    <td className={styles.tdRight} style={{ fontWeight: 700 }}>
-                                      €{student.total.toFixed(2)}
-                                    </td>
-                                  </tr>
-                                ))}
+                                {group.students.map((student) => {
+                                  const isStudentExpanded = !!expandedStudents[student.studentId]
+
+                                  return (
+                                    <Fragment key={student.studentId}>
+                                      <tr 
+                                        className={`${styles.trHover} ${styles.clickableRow} ${isStudentExpanded ? styles.rowExpanded : ''}`}
+                                        onClick={() => toggleStudent(student.studentId)}
+                                        title="Klik op de leerling om de bestellingdetails in/uit te klappen"
+                                      >
+                                        <td className={styles.tdCenter}>
+                                          <span className={styles.classNumberBadge}>
+                                            {student.classNumber != null ? `#${student.classNumber}` : '-'}
+                                          </span>
+                                        </td>
+                                        <td style={{ fontWeight: 600 }}>
+                                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            <span className={`${styles.chevron} ${isStudentExpanded ? styles.chevronRotated : ''}`} style={{ fontSize: '0.75rem', width: '14px' }}>▶</span>
+                                            <span className={styles.clickableName}>{student.studentName}</span>
+                                          </div>
+                                        </td>
+                                        <td className={styles.tdCenter}>{student.totalMeals}</td>
+                                        <td className={styles.tdRight} style={{ fontWeight: 700 }}>
+                                          €{student.total.toFixed(2)}
+                                        </td>
+                                      </tr>
+
+                                      {/* Uitgeklapte bestellingen voor deze leerling */}
+                                      {isStudentExpanded && (
+                                        <tr className={styles.detailSubRow}>
+                                          <td colSpan={4} style={{ padding: 0 }}>
+                                            <div className={styles.detailContainer}>
+                                              <div className={styles.detailSubHeader}>
+                                                <span>📋 Bestellingendetails voor {student.studentName} ({student.orders.length} bestelling{student.orders.length === 1 ? '' : 'en'})</span>
+                                                <span style={{ fontWeight: 700, color: 'var(--primary)' }}>Subtotaal: €{student.total.toFixed(2)}</span>
+                                              </div>
+                                              <table className={`${styles.table} ${styles.detailTable}`}>
+                                                <thead>
+                                                  <tr>
+                                                    <th style={{ width: '140px' }}>Datum</th>
+                                                    <th>Maaltijd</th>
+                                                    <th className={styles.thCenter} style={{ width: '90px' }}>Aantal</th>
+                                                    <th className={styles.thRight} style={{ width: '120px' }}>Prijs</th>
+                                                  </tr>
+                                                </thead>
+                                                <tbody>
+                                                  {student.orders.map(order => (
+                                                    <tr key={order.id}>
+                                                      <td>{formatOrderDate(order.order_date)}</td>
+                                                      <td style={{ fontWeight: 500 }}>{order.student_meals?.name || 'Onbekend'}</td>
+                                                      <td className={styles.tdCenter}>{order.quantity}</td>
+                                                      <td className={styles.tdRight} style={{ fontWeight: 600 }}>
+                                                        €{((order.quantity || 1) * (order.price_at_order || 0)).toFixed(2)}
+                                                      </td>
+                                                    </tr>
+                                                  ))}
+                                                </tbody>
+                                              </table>
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      )}
+                                    </Fragment>
+                                  )
+                                })}
                               </tbody>
                               <tfoot>
                                 <tr className={styles.trFooter}>
@@ -523,186 +679,6 @@ export default function MonthlyOverviewReport({ schoolId }: { schoolId: string }
               </div>
             </div>
           )}
-        </div>
-      ) : (
-        /* ================= STANDAARDWEERGAVE (GEDETAILLEERD) ================= */
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem' }}>
-          
-          {/* Details Leerkrachten */}
-          <div className={styles.section}>
-            <div className={styles.sectionHeader}>
-              <h3 className={styles.sectionTitle}>
-                <span>👩‍🏫</span> Details Leerkrachten
-              </h3>
-              <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                Totaal: <strong>€{totalTeachersBilling.toFixed(2)}</strong> ({totalTeacherMeals} maaltijden)
-              </span>
-            </div>
-
-            {groupedByTeacher.length === 0 ? (
-              <div className={styles.emptyState}>Geen leerkrachtenbestellingen voor deze maand.</div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                {groupedByTeacher.map(teacher => (
-                  <div key={teacher.name} style={{ backgroundColor: 'var(--surface)', padding: '1.25rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>
-                      <h4 style={{ fontSize: '1.1rem', fontWeight: 'bold', margin: 0 }}>{teacher.name}</h4>
-                      <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: 'var(--primary)' }}>
-                        Totaal: €{teacher.total.toFixed(2)} ({teacher.totalMeals} maaltijd{teacher.totalMeals === 1 ? '' : 'en'})
-                      </div>
-                    </div>
-                    
-                    <div className={styles.tableWrapper}>
-                      <table className={styles.table} style={{ fontSize: '0.9rem' }}>
-                        <thead>
-                          <tr>
-                            <th style={{ width: '130px' }}>Datum</th>
-                            <th>Maaltijd</th>
-                            <th className={styles.thCenter} style={{ width: '80px' }}>Aantal</th>
-                            <th>Opmerking</th>
-                            <th className={styles.thRight} style={{ width: '100px' }}>Prijs</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {teacher.orders.map(order => (
-                            <tr key={order.id} className={styles.trHover}>
-                              <td>
-                                {new Date(order.order_date + 'T00:00:00').toLocaleDateString('nl-BE')}
-                              </td>
-                              <td>{order.meals?.name || 'Onbekend'}</td>
-                              <td className={styles.tdCenter}>{order.quantity}</td>
-                              <td style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>
-                                {order.note || '-'}
-                              </td>
-                              <td className={styles.tdRight}>
-                                €{((order.quantity || 1) * (order.price_at_order || 0)).toFixed(2)}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Details Leerlingen (Gebundeld per klas, standaard samengevouwen) */}
-          {groupedByClass.length > 0 && (
-            <div className={styles.section}>
-              <div className={styles.sectionHeader}>
-                <h3 className={styles.sectionTitle}>
-                  <span>🧒</span> Details Leerlingen (per klas)
-                </h3>
-                <div className={styles.sectionActions}>
-                  <button 
-                    type="button" 
-                    onClick={expandAllClasses} 
-                    className={styles.actionBtn}
-                  >
-                    ▼ Alles uitklappen
-                  </button>
-                  <button 
-                    type="button" 
-                    onClick={collapseAllClasses} 
-                    className={styles.actionBtn}
-                  >
-                    ▲ Alles inklappen
-                  </button>
-                </div>
-              </div>
-
-              <div className={styles.classList}>
-                {groupedByClass.map(group => {
-                  const classKey = group.classId || group.className
-                  const isExpanded = !!expandedClasses[classKey]
-
-                  return (
-                    <div key={classKey} className={styles.classCard}>
-                      <div 
-                        className={`${styles.classHeader} ${isExpanded ? styles.classHeaderExpanded : ''}`}
-                        onClick={() => toggleClass(classKey)}
-                        title="Klik om klas in/uit te klappen"
-                      >
-                        <div className={styles.classHeaderLeft}>
-                          <span className={`${styles.chevron} ${isExpanded ? styles.chevronRotated : ''}`}>▶</span>
-                          <span className={styles.classTitle}>Klas {group.className}</span>
-                          <span className={styles.classMeta}>
-                            ({group.students.length} leerlingen • {group.totalMeals} maaltijden)
-                          </span>
-                        </div>
-                        <div className={styles.classHeaderRight}>
-                          <span className={styles.classTotalBadge}>€{group.total.toFixed(2)}</span>
-                        </div>
-                      </div>
-
-                      {/* Uitgeklapte details per leerling in deze klas */}
-                      {isExpanded && (
-                        <div className={styles.classBody}>
-                          <div className={styles.studentCardsList}>
-                            {group.students.map(student => (
-                              <div key={student.studentId} className={styles.studentDetailCard}>
-                                <div className={styles.studentDetailHeader}>
-                                  <div className={styles.studentNameTag}>
-                                    <span className={styles.classNumberBadge}>
-                                      {student.classNumber != null ? `#${student.classNumber}` : '-'}
-                                    </span>
-                                    <span>{student.studentName}</span>
-                                    <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 'normal' }}>
-                                      ({student.className})
-                                    </span>
-                                  </div>
-                                  <div className={styles.studentTotalAmount}>
-                                    Totaal: €{student.total.toFixed(2)} ({student.totalMeals} maaltijd{student.totalMeals === 1 ? '' : 'en'})
-                                  </div>
-                                </div>
-                                
-                                <div className={styles.tableWrapper}>
-                                  <table className={styles.table} style={{ fontSize: '0.9rem' }}>
-                                    <thead>
-                                      <tr>
-                                        <th style={{ width: '130px' }}>Datum</th>
-                                        <th>Maaltijd</th>
-                                        <th className={styles.thCenter} style={{ width: '80px' }}>Aantal</th>
-                                        <th className={styles.thRight} style={{ width: '100px' }}>Prijs</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {student.orders.map(order => (
-                                        <tr key={order.id} className={styles.trHover}>
-                                          <td>
-                                            {new Date(order.order_date + 'T00:00:00').toLocaleDateString('nl-BE')}
-                                          </td>
-                                          <td>{order.student_meals?.name || 'Onbekend'}</td>
-                                          <td className={styles.tdCenter}>{order.quantity}</td>
-                                          <td className={styles.tdRight}>
-                                            €{((order.quantity || 1) * (order.price_at_order || 0)).toFixed(2)}
-                                          </td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-
-              {/* Totaalrij alle klassen */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '1rem', backgroundColor: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                <span style={{ fontSize: '1.05rem', fontWeight: 600 }}>
-                  Totaal alle klassen: <span style={{ color: 'var(--primary)', fontWeight: 700, fontSize: '1.15rem' }}>€{totalStudentsBilling.toFixed(2)}</span> ({totalStudentMeals} maaltijden)
-                </span>
-              </div>
-            </div>
-          )}
-
         </div>
       )}
     </div>

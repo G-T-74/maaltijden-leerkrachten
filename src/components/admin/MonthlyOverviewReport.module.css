@@ -384,6 +384,64 @@
   border-top: 2px solid var(--border);
 }
 
+/* Detail subrow binnen overzichtstabellen */
+.clickableRow {
+  cursor: pointer;
+  user-select: none;
+}
+
+.clickableName {
+  color: var(--text-main);
+  transition: color 0.15s ease;
+}
+
+.trHover:hover .clickableName {
+  color: var(--primary);
+}
+
+.rowExpanded {
+  background-color: rgba(59, 130, 246, 0.05) !important;
+}
+
+.detailSubRow {
+  background-color: var(--background);
+}
+
+.detailContainer {
+  padding: 0.85rem 1.25rem 1rem 1.75rem;
+  border-left: 3px solid var(--primary);
+  background-color: rgba(59, 130, 246, 0.02);
+}
+
+.detailSubHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px dashed var(--border);
+}
+
+.detailTable {
+  font-size: 0.875rem;
+  background-color: var(--surface);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+
+.detailTable th {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.detailTable td {
+  padding: 0.5rem 0.75rem;
+}
+
 .emptyState {
   padding: 2.5rem;
   text-align: center;
@@ -407,5 +465,14 @@
     box-shadow: none !important;
     border: 1px solid #ccc !important;
     page-break-inside: avoid;
+  }
+
+  .detailSubRow, .detailContainer {
+    background-color: transparent !important;
+    border-left-color: #666 !important;
+  }
+
+  .chevron {
+    display: none !important;
   }
 }
